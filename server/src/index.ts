@@ -56,16 +56,7 @@ app.get('/', (req, res) => {
   res.send('Game Match API is Ready!');
 });
 
-// Temporary endpoint to wipe user data
-app.get('/api/wipe', async (req, res) => {
-  try {
-    const { pool } = await import('./config/db.js');
-    const result = await pool.query('DELETE FROM users;');
-    res.json({ message: `Successfully wiped ${result.rowCount} users and all cascading data.` });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// Removed temporary wipe endpoint
 
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {

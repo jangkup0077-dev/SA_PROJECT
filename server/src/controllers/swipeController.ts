@@ -70,6 +70,7 @@ export const swipeUser = async (req: AuthRequest, res: Response) => {
     );
 
     let isMatch = false;
+    let matchId: number | undefined;
 
     // 2. ถ้าเรากด LIKE ให้ไปเช็คว่าเขากด LIKE เราไว้ก่อนหน้านี้ไหม
     if (status === 'LIKE') {
@@ -82,14 +83,15 @@ export const swipeUser = async (req: AuthRequest, res: Response) => {
       if (checkMatch.rows.length > 0) {
         isMatch = true;
         // บันทึกลงตาราง matches
-        await pool.query(
-          'INSERT INTO matches (user_one_id, user_two_id) VALUES ($1, $2)',
+        const matchRes = await pool.query(
+          'INSERT INTO matches (user_one_id, user_two_id) VALUES ($1, $2) RETURNING id',
           [myId, targetId] // หรือ [targetId, myId] ก็ได้
         );
+        matchId = matchRes.rows[0].id;
       }
     }
 
-    res.json({ message: 'Swipe recorded', isMatch });
+    res.json({ message: 'Swipe recorded', isMatch, matchId });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
