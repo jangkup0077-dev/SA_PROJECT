@@ -1,33 +1,98 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
-import LoginView from '../views/LoginView.vue'
-import RegisterView from '../views/RegisterView.vue'
-import ChatView from '../views/ChatView.vue';
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'login',
-      component: LoginView
+      name: 'home',
+      redirect: '/login'
     },
-	{
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue')
+    },
+    {
       path: '/register',
       name: 'register',
-      component: RegisterView
+      component: () => import('../views/RegisterView.vue')
     },
     {
-      path: '/home',
-      name: 'home',
-      component: HomeView
+      path: '/register/profile',
+      name: 'registerProfile',
+      component: () => import('../views/RegisterProfileView.vue')
     },
     {
-      path: '/chat/:id',
+      path: '/register/tags',
+      name: 'registerTags',
+      component: () => import('../views/RegisterTagsView.vue')
+    },
+    {
+      path: '/register/photos',
+      name: 'registerPhotos',
+      component: () => import('../views/RegisterPhotosView.vue')
+    },
+    {
+      path: '/setup-profile',
+      name: 'setupProfile',
+      component: () => import('../views/SetupProfileView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/discover',
+      name: 'discover',
+      component: () => import('../views/DiscoverView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/matches',
+      name: 'matches',
+      component: () => import('../views/MatchesView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/chat/:matchId',
       name: 'chat',
-      component: ChatView
+      component: () => import('../views/ChatView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('../views/ProfileView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('../views/AdminView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true }
     }
   ]
+})
+
+// Navigation Guard
+router.beforeEach(async (to) => {
+  const authStore = useAuthStore()
+
+  // Try to re-hydrate state if token exists but user object is missing
+  if (authStore.token && !authStore.user) {
+    await authStore.checkAuth()
+  }
+
+  const isAuth = authStore.isAuthenticated && !!authStore.user
+  const isAdmin = authStore.user?.is_admin
+
+  if (to.meta.requiresAuth && !isAuth) {
+    return '/login'
+  } else if (to.meta.requiresAdmin && !isAdmin) {
+    return '/discover'
+  } else if ((to.name === 'login' || to.path.startsWith('/register')) && isAuth) {
+    return '/discover'
+  }
+  // Allow navigation by returning nothing
 })
 
 export default router

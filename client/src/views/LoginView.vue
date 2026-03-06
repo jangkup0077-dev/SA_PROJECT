@@ -1,70 +1,88 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api'
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+const email = ref('')
+const password = ref('')
+const errorMsg = ref('')
+const loading = ref(false)
+
+const handleLogin = async () => {
+  errorMsg.value = ''
+  loading.value = true
+  try {
+    const res = await api.post('/auth/login', {
+      email: email.value,
+      password: password.value
+    })
+    authStore.setAuth(res.data.token, res.data.user)
+    router.push('/discover')
+  } catch (err: any) {
+    errorMsg.value = err.response?.data?.message || 'Login failed. Please check your credentials.'
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-200">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
-      <h1 class="text-2xl font-bold text-center mb-6">Game Match Login</h1>
-      
-      <form @submit.prevent="handleLogin" class="flex flex-col gap-4">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-sm flex flex-col items-center">
+
+      <!-- Profile Icon -->
+      <div class="w-20 h-20 rounded-full bg-[var(--color-input-bg)] flex items-center justify-center mb-8 shadow-lg shadow-purple-500/10">
+        <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+        </svg>
+      </div>
+
+      <!-- Form -->
+      <form @submit.prevent="handleLogin" class="w-full space-y-4">
         <div>
-          <label class="block text-sm font-medium mb-1">Email / SID</label>
-          <input 
-            v-model="form.email"   type="text" 
-            placeholder="kkumail or SID" 
+          <input
+            v-model="email"
+            id="login-email"
+            type="email"
             required
-            class="w-full border border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-3.5 bg-[var(--color-input-bg)] border border-white/5 rounded-2xl outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all text-white placeholder-gray-500 text-sm"
+            placeholder="Email"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium mb-1">Password</label>
-          <input 
-            v-model="form.password" type="password" 
-            placeholder="Password" 
+          <input
+            v-model="password"
+            id="login-password"
+            type="password"
             required
-            class="w-full border border-gray-300 rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-3.5 bg-[var(--color-input-bg)] border border-white/5 rounded-2xl outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all text-white placeholder-gray-500 text-sm"
+            placeholder="Password"
           />
         </div>
 
-        <p v-if="errorMessage" class="text-red-500 text-sm text-center font-semibold">
-          {{ errorMessage }}
-        </p>
+        <p v-if="errorMsg" class="text-red-400 text-sm text-center font-medium">{{ errorMsg }}</p>
 
-        <button 
-          type="submit" 
-          class="bg-blue-600 text-white font-bold py-2 rounded mt-2 hover:bg-blue-700"
+        <button
+          type="submit"
+          :disabled="loading"
+          id="login-button"
+          class="w-full py-3.5 mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-2xl shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
         >
-          Log in
+          {{ loading ? 'Logging in...' : 'Log in' }}
         </button>
       </form>
 
-      <div class="mt-4 text-center text-sm">
-        <p>ยังไม่มีบัญชี? <router-link to="/register" class="text-blue-500 underline">สมัครสมาชิก</router-link></p>
-      </div>
+      <!-- Register Link -->
+      <p class="text-center text-gray-500 mt-8 text-sm">
+        Don't have an account?
+        <RouterLink to="/register" class="text-purple-400 hover:text-purple-300 font-medium transition-colors">Register</RouterLink>
+      </p>
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import api from '../api';
-
-const router = useRouter();
-const form = ref({ email: '', password: '' });
-const errorMessage = ref('');
-
-const handleLogin = async () => {
-  try {
-    errorMessage.value = '';
-    // ยิง API Login
-    const response = await api.post('/auth/login', form.value);
-    
-    // เก็บ Token ลงในเครื่อง
-    localStorage.setItem('token', response.data.token);
-    
-    // พาไปหน้า Home
-    router.push('/home');
-  } catch (error: any) {
-    errorMessage.value = error.response?.data?.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
-  }
-};
-</script>

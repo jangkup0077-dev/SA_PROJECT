@@ -15,7 +15,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json()); 
+app.use(express.json());
 
 connectDB();
 
@@ -54,6 +54,17 @@ app.use('/api/admin', adminRoutes);
 
 app.get('/', (req, res) => {
   res.send('Game Match API is Ready!');
+});
+
+// Temporary endpoint to wipe user data
+app.get('/api/wipe', async (req, res) => {
+  try {
+    const { pool } = await import('./config/db.js');
+    const result = await pool.query('DELETE FROM users;');
+    res.json({ message: `Successfully wiped ${result.rowCount} users and all cascading data.` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
