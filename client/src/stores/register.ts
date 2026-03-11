@@ -5,7 +5,8 @@ export const useRegisterStore = defineStore('register', {
         email: '',
         password: '',
         username: '',
-        age: '' as number | '',
+        birth_date: '',
+        country: '',
         bio: '',
         selectedTags: [] as string[],
         photos: [] as File[],
@@ -15,10 +16,11 @@ export const useRegisterStore = defineStore('register', {
             this.email = email
             this.password = password
         },
-        setProfile(username: string, age: number | '', bio: string) {
+        setProfile(username: string, birth_date: string, bio: string, country: string) { 
             this.username = username
-            this.age = age
+            this.birth_date = birth_date
             this.bio = bio
+            this.country = country
         },
         toggleTag(tag: string) {
             const index = this.selectedTags.indexOf(tag)
@@ -40,7 +42,8 @@ export const useRegisterStore = defineStore('register', {
             this.email = ''
             this.password = ''
             this.username = ''
-            this.age = ''
+            this.birth_date = ''
+            this.country = ''
             this.bio = ''
             this.selectedTags = []
             this.photos = []

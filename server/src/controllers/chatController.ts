@@ -1,9 +1,8 @@
 import { Response } from 'express';
 import { pool } from '../config/db.js';
 import { AuthRequest } from '../middleware/authMiddleware.js';
-import { io } from '../index.js';
+import { io } from '../index.js'; 
 
-// 1. ดึงประวัติข้อความทั้งหมด (GET /api/chat/:matchId)
 export const getMessages = async (req: AuthRequest, res: Response) => {
   try {
     const myId = req.user?.userId;
@@ -13,7 +12,6 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Invalid match ID' });
     }
 
-    // ระบบรักษาความปลอดภัย: เช็คว่าเราเป็น 1 ในคนที่อยู่ใน Match นี้จริงๆ ใช่ไหม
     const checkMatch = await pool.query(
       'SELECT * FROM matches WHERE id = $1 AND (user_one_id = $2 OR user_two_id = $2)',
       [matchId, myId]
@@ -23,9 +21,8 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ message: 'Access denied: You are not part of this match' });
     }
 
-    // ดึงข้อความเรียงตามเวลาเก่าไปใหม่
     const messages = await pool.query(
-      'SELECT * FROM message WHERE match_id = $1 ORDER BY sent_at ASC',
+      'SELECT * FROM messages WHERE match_id = $1 ORDER BY sent_at ASC',
       [matchId]
     );
 
@@ -36,15 +33,14 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// 2. ส่งข้อความใหม่ (POST /api/chat/:matchId)
 export const sendMessage = async (req: AuthRequest, res: Response) => {
   try {
     const myId = req.user?.userId;
     const { matchId } = req.params;
-    const { message_content } = req.body;
+    const { message_content, message_type = 'TEXT' } = req.body;
 
     if (isNaN(Number(matchId))) {
-        return res.status(400).json({ message: 'Invalid match ID' });
+      return res.status(400).json({ message: 'Invalid match ID' });
     }
 
     if (!message_content) {
@@ -60,16 +56,21 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // 1. บันทึกข้อความลง Database
+    //const matchData = checkMatch.rows[0];
+    //const targetUserId = matchData.user_one_id === myId ? matchData.user_two_id : matchData.user_one_id;
+
     const newMessage = await pool.query(
-      'INSERT INTO message (match_id, sender_id, message_content) VALUES ($1, $2, $3) RETURNING *',
-      [matchId, myId, message_content]
+      'INSERT INTO messages (match_id, sender_id, message_type, message_content) VALUES ($1, $2, $3, $4) RETURNING *',
+      [matchId, myId, message_type, message_content]
     );
 
     const savedMessage = newMessage.rows[0];
 
-    // 2. ส่งข้อความเด้งไปหาห้องแชทนั้นๆ ผ่าน Socket ทันที
     io.to(`match_${matchId}`).emit('receive_message', savedMessage);
+
+    const matchData = checkMatch.rows[0];
+    const targetUserId = matchData.user_one_id === myId ? matchData.user_two_id : matchData.user_one_id;
+    io.to(`user_${targetUserId}`).emit('new_notification', { type: 'message' });
 
     res.status(201).json(savedMessage);
   } catch (err) {

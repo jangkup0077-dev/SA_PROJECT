@@ -15,6 +15,7 @@ export const useChatStore = defineStore('chat', {
         messages: [] as ChatMessage[],
         activeMatchId: null as number | null,
         matchesList: [] as any[],
+        hasUnread: false,
     }),
     actions: {
         async fetchMatches() {

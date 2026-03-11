@@ -27,6 +27,8 @@ onMounted(async () => {
     return
   }
 
+  chatStore.hasUnread = false
+
   if (chatStore.matchesList.length === 0) {
     await chatStore.fetchMatches()
   }

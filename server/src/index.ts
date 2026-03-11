@@ -32,6 +32,10 @@ export const io = new Server(httpServer, {
 
 io.on('connection', (socket) => {
   console.log('⚡ User connected:', socket.id);
+  
+  socket.on('join_global', (userId) => {
+    socket.join(`user_${userId}`);
+  });
 
   socket.on('join_match', (matchId) => {
     socket.join(`match_${matchId}`);

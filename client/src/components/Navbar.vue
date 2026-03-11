@@ -2,9 +2,11 @@
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { HomeIcon, ChatBubbleLeftIcon, UserCircleIcon } from '@heroicons/vue/24/outline'
+import { useChatStore } from '@/stores/chat'
 
 const router = useRouter()
 const route = useRoute()
+const chatStore = useChatStore()
 
 // Hide navbar on login, register (all steps), setup
 const hideNavbar = computed(() => {
@@ -38,7 +40,7 @@ const hideNavbar = computed(() => {
       >
         <ChatBubbleLeftIcon class="h-7 w-7" />
         <!-- Notification badge would theoretically hook to a chat store here -->
-        <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-[var(--color-dark-bg)]"></span>
+        <span v-if="chatStore.hasUnread" class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-[var(--color-dark-bg)]"></span>
       </button>
       <button 
         @click="router.push('/profile')"
