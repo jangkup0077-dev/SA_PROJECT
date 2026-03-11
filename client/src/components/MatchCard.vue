@@ -28,8 +28,6 @@ const goToChat = () => {
       <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-purple-500/30">
         <img :src="match.target_avatar || '/placeholder-avatar.png'" class="w-full h-full object-cover" />
       </div>
-      <!-- Online dot -->
-      <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[var(--color-dark-bg)]"></div>
     </div>
 
     <!-- Text Content -->

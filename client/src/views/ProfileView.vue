@@ -213,7 +213,6 @@ const cancelEdit = () => {
               </svg>
             </div>
           </div>
-          <div class="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-[var(--color-dark-bg)]"></div>
         </div>
         <h2 class="text-xl font-bold mt-3">{{ displayName || authStore.user?.name || 'User' }}</h2>
         <p class="text-gray-500 text-sm">{{ email || authStore.user?.email }}</p>
