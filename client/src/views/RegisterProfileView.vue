@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRegisterStore } from '@/stores/register'
 
@@ -7,23 +7,42 @@ const router = useRouter()
 const registerStore = useRegisterStore()
 
 const username = ref(registerStore.username || '')
-const age = ref<number | ''>(registerStore.age || '')
+const birth_date = ref('')
 const bio = ref(registerStore.bio || '')
+const country = ref(registerStore.country || '')
 const errorMsg = ref('')
+
+const isLocating = ref(false)
+
+onMounted(async () => {
+  if (!country.value) {
+    isLocating.value = true
+    try {
+      const res = await fetch('https://ipapi.co/json/')
+      const data = await res.json()
+      if (data.country_name) {
+        country.value = data.country_name // เช่น "Thailand"
+      }
+      console.log('[IP API] Auto-detected country:', data.country_name)
+    } catch (err) {
+      console.error('Failed to auto-detect country', err)
+    } finally {
+      isLocating.value = false
+    }
+  }
+})
 
 const goBack = () => {
   router.push('/register')
 }
 
 const handleNext = () => {
-  errorMsg.value = ''
-
-  if (!username.value) {
-    errorMsg.value = 'Please enter a username.'
+  if (!username.value || !birth_date.value) {
+    errorMsg.value = 'Please fill in all required fields'
     return
   }
 
-  registerStore.setProfile(username.value, age.value, bio.value)
+  registerStore.setProfile(username.value, birth_date.value, bio.value, country.value)
   router.push('/register/tags')
 }
 </script>
@@ -67,14 +86,11 @@ const handleNext = () => {
           </div>
 
           <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 ml-1">Date of Birth</label>
             <input
-              v-model="age"
-              id="profile-age"
-              type="number"
-              min="1"
-              max="120"
+              v-model="birth_date"
+              type="date"
               class="w-full px-4 py-3.5 bg-[var(--color-input-bg)] border border-white/5 rounded-2xl outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all text-white placeholder-gray-500 text-sm"
-              placeholder="Age"
             />
           </div>
 

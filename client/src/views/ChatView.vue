@@ -27,6 +27,8 @@ onMounted(async () => {
     return
   }
 
+  chatStore.hasUnread = false
+
   if (chatStore.matchesList.length === 0) {
     await chatStore.fetchMatches()
   }
@@ -56,7 +58,7 @@ const formatTime = (dateStr: string) => {
 const groupedMessages = computed(() => {
   return chatStore.messages.map(msg => ({
     ...msg,
-    isSelf: msg.sender_id === authStore.user?.id,
+    isSelf: Number(msg.sender_id) === Number(authStore.user?.id),
     time: formatTime(msg.sent_at)
   }))
 })

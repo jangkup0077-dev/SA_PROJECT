@@ -85,8 +85,9 @@ const handleCreateAccount = async () => {
     await api.put('/profile', {
       display_name: registerStore.username,
       bio: registerStore.bio,
-      age: Number(registerStore.age) || 0,
-      profile_images: uploadedUrls
+      birth_date: registerStore.birth_date,
+      country: registerStore.country,
+      profile_image_url: uploadedUrls 
     })
 
     // 5. Add game tags

@@ -12,7 +12,7 @@ const authStore = useAuthStore()
 const displayName = ref('')
 const email = ref('')
 const bio = ref('')
-const age = ref<number | ''>('')
+const birth_date = ref('') // อัปเดตตัวแปรเป็น birth_date
 const country = ref('')
 const avatarUrl = ref('')
 const profileImages = ref<string[]>([])
@@ -42,10 +42,14 @@ onMounted(async () => {
       displayName.value = profileRes.data.display_name || profileRes.data.name || authStore.user?.name || ''
       email.value = profileRes.data.email || authStore.user?.email || ''
       bio.value = profileRes.data.bio || ''
-      age.value = profileRes.data.age || ''
+      
+      if (profileRes.data.birth_date) {
+        birth_date.value = new Date(profileRes.data.birth_date).toISOString().split('T')[0]
+      }
+      
       country.value = profileRes.data.country || ''
-      avatarUrl.value = profileRes.data.profile_images?.[0] || ''
-      profileImages.value = profileRes.data.profile_images || []
+      avatarUrl.value = profileRes.data.profile_image_url?.[0] || ''
+      profileImages.value = profileRes.data.profile_image_url || []
 
       if (profileRes.data.games) {
         selectedGames.value = profileRes.data.games.map((g: any) => g.id)
@@ -98,17 +102,29 @@ const handleSave = async () => {
       newAvatarUrl = uploadRes.data.imageUrl
     }
 
+    let updatedImages = [...profileImages.value]
+    if (newAvatarUrl && newAvatarUrl !== updatedImages[0]) {
+      if (updatedImages.length > 0) {
+        updatedImages[0] = newAvatarUrl
+      } else {
+        updatedImages.push(newAvatarUrl)
+      }
+    }
+
     await api.put('/profile', {
       display_name: displayName.value,
       bio: bio.value,
-      age: Number(age.value) || 0,
+      birth_date: birth_date.value,
       country: country.value,
-      profile_images: newAvatarUrl ? [newAvatarUrl] : []
+      profile_image_url: updatedImages
     })
 
+    // ลบเกมเก่าออกให้หมดแล้วเซฟใหม่
     for (const gameId of selectedGames.value) {
       await api.post('/profile/games', { gameId }).catch(() => {})
     }
+
+    profileImages.value = updatedImages
 
     saveSuccess.value = true
     isEditing.value = false
@@ -135,10 +151,7 @@ const cancelEdit = () => {
 <template>
   <div class="max-w-lg mx-auto w-full px-4 pb-28 pt-6 animate-fade-in">
 
-    <!-- ============= VIEW MODE ============= -->
     <template v-if="!isEditing">
-
-      <!-- Header -->
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold tracking-tight">Profile</h1>
         <button
@@ -150,7 +163,6 @@ const cancelEdit = () => {
         </button>
       </div>
 
-      <!-- Avatar Card -->
       <div class="flex flex-col items-center mb-8">
         <div class="relative">
           <div class="w-24 h-24 rounded-full overflow-hidden ring-4 ring-purple-500/30 shadow-[0_0_30px_rgba(124,58,237,0.15)]">
@@ -167,14 +179,12 @@ const cancelEdit = () => {
               </svg>
             </div>
           </div>
-          <!-- Online indicator -->
           <div class="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-[var(--color-dark-bg)]"></div>
         </div>
         <h2 class="text-xl font-bold mt-3">{{ displayName || authStore.user?.name || 'User' }}</h2>
         <p class="text-gray-500 text-sm">{{ email || authStore.user?.email }}</p>
       </div>
 
-      <!-- Photos Section -->
       <div v-if="profileImages.length > 0" class="mb-6">
         <div class="flex items-center justify-between mb-3">
           <span class="text-sm font-medium text-gray-400">Photos</span>
@@ -190,19 +200,15 @@ const cancelEdit = () => {
         </div>
       </div>
 
-      <!-- Info Cards -->
       <div class="space-y-3 mb-6">
-        <!-- Bio -->
         <div v-if="bio" class="bg-white/[0.03] border border-white/5 rounded-2xl p-4">
           <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Bio</span>
           <p class="text-white text-sm mt-1.5 leading-relaxed">{{ bio }}</p>
         </div>
-
-        <!-- Details Row -->
         <div class="grid grid-cols-2 gap-3">
           <div class="bg-white/[0.03] border border-white/5 rounded-2xl p-4">
-            <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Age</span>
-            <p class="text-white text-sm mt-1.5 font-medium">{{ age || '—' }}</p>
+            <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Birth Date</span>
+            <p class="text-white text-sm mt-1.5 font-medium">{{ birth_date || '—' }}</p>
           </div>
           <div class="bg-white/[0.03] border border-white/5 rounded-2xl p-4">
             <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Country</span>
@@ -211,7 +217,6 @@ const cancelEdit = () => {
         </div>
       </div>
 
-      <!-- Game Tags -->
       <div v-if="userGames.length > 0" class="mb-8">
         <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Games</span>
         <div class="flex flex-wrap gap-2 mt-3">
@@ -224,7 +229,6 @@ const cancelEdit = () => {
         </div>
       </div>
 
-      <!-- Edit Button -->
       <button
         @click="isEditing = true"
         id="edit-profile-button"
@@ -233,7 +237,6 @@ const cancelEdit = () => {
         Edit Profile
       </button>
 
-      <!-- Success Toast -->
       <Transition name="toast">
         <div v-if="saveSuccess" class="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 bg-green-500/20 border border-green-500/30 text-green-400 rounded-2xl text-sm font-medium backdrop-blur-md shadow-lg">
           ✓ Profile updated successfully
@@ -241,10 +244,7 @@ const cancelEdit = () => {
       </Transition>
     </template>
 
-    <!-- ============= EDIT MODE ============= -->
     <template v-else>
-
-      <!-- Header -->
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
           <button
@@ -259,7 +259,6 @@ const cancelEdit = () => {
         </div>
       </div>
 
-      <!-- Avatar Upload -->
       <div class="flex flex-col items-center mb-8">
         <input id="avatar-file-input" type="file" accept="image/*" class="hidden" @change="handleAvatarFile" />
         <div
@@ -278,7 +277,6 @@ const cancelEdit = () => {
                 d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
             </svg>
           </div>
-          <!-- Overlay -->
           <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -291,7 +289,6 @@ const cancelEdit = () => {
         <span class="text-gray-500 text-xs mt-2">Tap to change photo</span>
       </div>
 
-      <!-- Edit Form -->
       <div class="space-y-4 mb-6">
         <div>
           <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 ml-1" for="edit-name">Display Name</label>
@@ -317,15 +314,12 @@ const cancelEdit = () => {
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 ml-1" for="edit-age">Age</label>
+            <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 ml-1" for="edit-birthdate">Birth Date</label>
             <input
-              v-model="age"
-              id="edit-age"
-              type="number"
-              min="1"
-              max="120"
+              v-model="birth_date"
+              id="edit-birthdate"
+              type="date"
               class="w-full px-4 py-3.5 bg-[var(--color-input-bg)] border border-white/5 rounded-2xl outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all text-white placeholder-gray-500 text-sm"
-              placeholder="Age"
             />
           </div>
           <div>
@@ -341,7 +335,6 @@ const cancelEdit = () => {
         </div>
       </div>
 
-      <!-- Game Tags -->
       <div class="mb-8">
         <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-3 ml-1">Your Games</label>
         <div class="flex flex-wrap gap-2">
@@ -355,7 +348,6 @@ const cancelEdit = () => {
         </div>
       </div>
 
-      <!-- Action Buttons -->
       <div class="space-y-3">
         <button
           @click="handleSave"

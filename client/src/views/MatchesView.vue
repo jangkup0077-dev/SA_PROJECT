@@ -14,6 +14,8 @@ onMounted(async () => {
     router.push('/login')
     return
   }
+  
+  chatStore.hasUnread = false
   await chatStore.fetchMatches()
 })
 </script>

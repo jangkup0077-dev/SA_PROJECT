@@ -1,27 +1,34 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRegisterStore } from '@/stores/register'
 import GameTag from '@/components/GameTag.vue'
+import api from '@/services/api'
 
 const router = useRouter()
 const registerStore = useRegisterStore()
 
 const searchQuery = ref('')
 
-const allTags = [
-  'ROV',
-  'Hayday',
-  'PubG',
-  'Valorant',
-  'CS2',
-  'League of Legends'
-]
+const allTags = ref<string[]>([])
+const loading = ref(true)
+
+onMounted(async () => {
+  try {
+    const res = await api.get('/profile/all-games')
+    allTags.value = res.data.map((game: any) => game.game_name)
+  } catch (error) {
+    console.error('Failed to load games from DB', error)
+    allTags.value = ['ROV', 'Hayday', 'PubG', 'Valorant', 'CS2', 'League of Legends']
+  } finally {
+    loading.value = false
+  }
+})
 
 const filteredTags = computed(() => {
-  if (!searchQuery.value.trim()) return allTags
+  if (!searchQuery.value.trim()) return allTags.value
   const q = searchQuery.value.toLowerCase()
-  return allTags.filter(tag => tag.toLowerCase().includes(q))
+  return allTags.value.filter(tag => tag.toLowerCase().includes(q))
 })
 
 const isSelected = (tag: string) => registerStore.selectedTags.includes(tag)
@@ -41,7 +48,6 @@ const handleNext = () => {
 
 <template>
   <div class="min-h-screen flex flex-col p-4">
-    <!-- Back Arrow -->
     <button
       @click="goBack"
       id="tags-back-button"
@@ -52,11 +58,9 @@ const handleNext = () => {
       </svg>
     </button>
 
-    <!-- Centered Content -->
     <div class="flex-1 flex items-center justify-center">
       <div class="w-full max-w-sm flex flex-col items-center">
 
-        <!-- Icon -->
         <div class="w-20 h-20 rounded-full bg-[var(--color-input-bg)] flex items-center justify-center mb-8 shadow-lg shadow-purple-500/10">
           <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -64,7 +68,6 @@ const handleNext = () => {
           </svg>
         </div>
 
-        <!-- Search Bar -->
         <div class="w-full mb-6">
           <div class="relative">
             <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,9 +83,11 @@ const handleNext = () => {
           </div>
         </div>
 
-        <!-- Tag Chips -->
         <div class="w-full flex flex-wrap gap-3 mb-8">
+          <div v-if="loading" class="text-gray-500 text-sm w-full text-center mt-4">กำลังโหลดรายชื่อเกม...</div>
+          
           <GameTag
+            v-else
             v-for="tag in filteredTags"
             :key="tag"
             :name="tag"
@@ -91,7 +96,6 @@ const handleNext = () => {
           />
         </div>
 
-        <!-- Next Button -->
         <button
           @click="handleNext"
           id="tags-next-button"
