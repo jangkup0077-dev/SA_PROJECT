@@ -163,3 +163,24 @@ export const getUserProfile = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+export const submitReport = async (req: AuthRequest, res: Response) => {
+  try {
+    const reporterId = req.user?.userId;
+    const { reportedId, reportType, description, images } = req.body;
+
+    if (!reportedId || !reportType) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    await pool.query(
+      'INSERT INTO reports (reporter_user_id, reported_user_id, report_type, description, images) VALUES ($1, $2, $3, $4, $5)',
+      [reporterId, reportedId, reportType, description, images || []]
+    );
+
+    res.status(201).json({ message: 'Report submitted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

@@ -13,7 +13,6 @@ const notificationStore = useNotificationStore()
 const showNotifications = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 
-// Hide navbar on login, register (all steps), setup
 const hideNavbar = computed(() => {
   return ['/login', '/setup-profile'].includes(route.path) || route.path.startsWith('/register') || route.path === '/'
 })
@@ -65,6 +64,7 @@ onUnmounted(() => {
         <HomeIcon class="h-7 w-7" />
       </button>
 
+      
       <button 
         @click="router.push('/matches')"
         class="transition-colors hover:text-white relative"

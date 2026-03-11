@@ -24,6 +24,7 @@ const avatarFile = ref<File | null>(null)
 
 const availableGames = ref<any[]>([])
 const selectedGames = ref<number[]>([])
+const originalGames = ref<number[]>([])
 
 const loading = ref(false)
 const saveSuccess = ref(false)
@@ -63,6 +64,9 @@ onMounted(async () => {
 
       if (profileRes.data.games) {
         selectedGames.value = profileRes.data.games.map((g: any) => g.id || g.game_id)
+        const mappedGames = profileRes.data.games.map((g: any) => g.game_id || g.id)
+        selectedGames.value = [...mappedGames]
+        originalGames.value = [...mappedGames]
       }
     }
   } catch (err) {
@@ -74,6 +78,7 @@ const userGames = computed(() => {
   return availableGames.value.filter(g => selectedGames.value.includes(g.id))
 })
 
+/*
 const toggleGame = (gameId: number) => {
   const index = selectedGames.value.indexOf(gameId)
   if (index > -1) {
@@ -81,6 +86,29 @@ const toggleGame = (gameId: number) => {
   } else {
     selectedGames.value.push(gameId)
   }
+}
+*/
+
+const gameSearchQuery = ref('')
+
+const filteredAvailableGames = computed(() => {
+  if (!gameSearchQuery.value.trim()) return []
+  const q = gameSearchQuery.value.toLowerCase()
+  return availableGames.value.filter(g => 
+    !selectedGames.value.includes(g.id) && 
+    g.game_name.toLowerCase().includes(q)
+  )
+})
+
+const removeGame = (gameId: number) => {
+  selectedGames.value = selectedGames.value.filter(id => id !== gameId)
+}
+
+const addGame = (gameId: number) => {
+  if (!selectedGames.value.includes(gameId)) {
+    selectedGames.value.push(gameId)
+  }
+  gameSearchQuery.value = '' // ล้างช่องค้นหาเพื่อให้ Dropdown หายไป
 }
 
 const triggerAvatarUpload = () => {
@@ -129,11 +157,18 @@ const handleSave = async () => {
       profile_image_url: updatedImages
     })
 
-    // ลบเกมเก่าออกให้หมดแล้วเซฟใหม่
-    for (const gameId of selectedGames.value) {
-      await api.post('/profile/games', { gameId }).catch(() => {})
+    const gamesToAdd = selectedGames.value.filter(id => !originalGames.value.includes(id))
+    const gamesToRemove = originalGames.value.filter(id => !selectedGames.value.includes(id))
+
+    for (const gameId of gamesToAdd) {
+      await api.post('/profile/games', { gameId }).catch(console.error)
     }
 
+    for (const gameId of gamesToRemove) {
+      await api.delete(`/profile/games/${gameId}`).catch(console.error)
+    }
+
+    originalGames.value = [...selectedGames.value]
     profileImages.value = updatedImages
 
     saveSuccess.value = true
@@ -200,7 +235,6 @@ const cancelEdit = () => {
               </svg>
             </div>
           </div>
-          <div class="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-[var(--color-dark-bg)]"></div>
         </div>
         <h2 class="text-xl font-bold mt-3">{{ displayName || authStore.user?.name || 'User' }}</h2>
         <p class="text-gray-500 text-sm">{{ email || authStore.user?.email }}</p>
@@ -359,14 +393,59 @@ const cancelEdit = () => {
 
       <div class="mb-8">
         <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-3 ml-1">Your Games</label>
-        <div class="flex flex-wrap gap-2">
-          <GameTag
-            v-for="game in availableGames"
+        
+        <div class="flex flex-wrap gap-2 mb-4">
+          <span
+            v-for="game in userGames"
             :key="game.id"
-            :name="game.game_name"
-            :selected="selectedGames.includes(game.id)"
-            @toggle="toggleGame(game.id)"
-          />
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full text-sm font-medium transition-all"
+          >
+            {{ game.game_name }}
+            <button 
+              @click="removeGame(game.id)" 
+              class="w-4 h-4 flex items-center justify-center rounded-full hover:bg-purple-500/40 text-purple-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </span>
+          <span v-if="userGames.length === 0" class="text-sm text-gray-500 px-2 py-1">No games selected</span>
+        </div>
+
+        <div class="relative">
+          <div class="relative">
+            <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input
+              v-model="gameSearchQuery"
+              type="text"
+              class="w-full pl-11 pr-4 py-3.5 bg-[var(--color-input-bg)] border border-white/5 rounded-2xl outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all text-white placeholder-gray-500 text-sm"
+              placeholder="Search to add more games..."
+            />
+          </div>
+
+          <div
+            v-if="gameSearchQuery.trim() && filteredAvailableGames.length > 0"
+            class="absolute z-10 w-full mt-2 bg-[var(--color-input-bg)] border border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-48 overflow-y-auto"
+          >
+            <button
+              v-for="game in filteredAvailableGames"
+              :key="game.id"
+              @click="addGame(game.id)"
+              class="w-full text-left px-4 py-3 hover:bg-white/5 text-white text-sm transition-colors border-b border-white/5 last:border-0 cursor-pointer flex items-center justify-between group"
+            >
+              <span>{{ game.game_name }}</span>
+              <span class="text-purple-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Add +</span>
+            </button>
+          </div>
+          <div
+            v-else-if="gameSearchQuery.trim() && filteredAvailableGames.length === 0"
+            class="absolute z-10 w-full mt-2 bg-[var(--color-input-bg)] border border-white/10 rounded-2xl shadow-xl px-4 py-4 text-sm text-gray-500 text-center"
+          >
+            No matching games found
+          </div>
         </div>
       </div>
 

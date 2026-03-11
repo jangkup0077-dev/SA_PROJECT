@@ -50,7 +50,7 @@ const timeAgo = computed(() => {
 <template>
   <button
     @click="goToChat"
-    class="w-full flex items-center gap-4 px-5 py-4 hover:bg-white/[0.03] transition-colors text-left cursor-pointer"
+    class="w-full flex items-center gap-4 px-5 py-4 bg-[rgba(255,255,255,0.03)] hover:bg-white/[0.03] transition-colors text-left cursor-pointer"
   >
     <!-- Avatar -->
     <div 

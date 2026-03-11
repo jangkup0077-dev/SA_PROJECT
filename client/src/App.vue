@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { watch } from 'vue'
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
 import Navbar from '@/components/Navbar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -10,13 +10,25 @@ import { getSocket } from '@/services/socket'
 const authStore = useAuthStore()
 const chatStore = useChatStore()
 const notificationStore = useNotificationStore()
+const route = useRoute()
 
 watch(() => authStore.isAuthenticated, (isAuth) => {
   if (isAuth && authStore.user) {
     const socket = getSocket()
 
-    socket.on('connect', () => socket.emit('join_global', authStore.user?.id))
-    if (socket.connected) socket.emit('join_global', authStore.user.id)
+    const userId = authStore.user?.id || (authStore.user as any)?.user_id
+
+    const joinGlobalRoom = () => {
+      if (userId) {
+        console.log(`🔗 Joining global room for user: ${userId}`)
+        socket.emit('join_global', userId)
+      }
+    }
+
+    socket.on('connect', joinGlobalRoom)
+    if (socket.connected) {
+      joinGlobalRoom()
+    }
 
     socket.off('new_notification')
     socket.on('new_notification', (data) => {
@@ -32,6 +44,13 @@ watch(() => authStore.isAuthenticated, (isAuth) => {
         type: data?.type || 'info',
         message: message
       })
+      console.log('🔔 New Notification Received:', data)
+      
+      if (!route.path.startsWith('/chat/')) {
+        chatStore.hasUnread = true 
+      }
+      
+      chatStore.fetchMatches()
     })
   }
 }, { immediate: true })

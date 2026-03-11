@@ -20,7 +20,6 @@ export const useChatStore = defineStore('chat', {
     actions: {
         async fetchMatches() {
             try {
-                // Backend: GET /api/swipe/matches
                 const res = await api.get('/swipe/matches')
                 this.matchesList = res.data.map((m: any) => {
                     // Normalize partner_images: pg can return TEXT[] as string "{url1,url2}"
@@ -41,6 +40,16 @@ export const useChatStore = defineStore('chat', {
                         matched_at: m.matched_at
                     }
                 })
+                this.matchesList = res.data.map((m: any) => ({
+                    id: m.match_id,
+                    target_id: m.partner_id,
+                    target_name: m.partner_name,
+                    target_avatar: m.partner_images && m.partner_images.length > 0 ? m.partner_images[0] : '',
+                    target_bio: m.partner_bio || '',
+                    target_birth_date: m.partner_birth_date || '',
+                    target_games: m.partner_games || [], 
+                    lastMessage: m.last_message || '' 
+                }))
             } catch (err) {
                 console.error('Fetch matches failed', err)
             }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getMyProfile, updateProfile, updateMyGames, getAllGames, removeMyGame, getUserProfile } from '../controllers/profileController.js';
+import { getMyProfile, updateProfile, updateMyGames, getAllGames, removeMyGame, getUserProfile, submitReport } from '../controllers/profileController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = Router();
@@ -15,5 +15,7 @@ router.delete('/games/:gameId', authenticateToken, removeMyGame);
 
 // Route สำหรับดูโปรไฟล์คนอื่น
 router.get('/:userId', authenticateToken, getUserProfile);
+
+router.post('/report', authenticateToken, submitReport);
 
 export default router;

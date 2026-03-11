@@ -80,7 +80,7 @@ export const swipeUser = async (req: AuthRequest, res: Response) => {
           'INSERT INTO matches (user_one_id, user_two_id) VALUES ($1, $2) RETURNING id',
           [myId, targetId] 
         );
-        matchId = matchRes.rows[0].id; // 👈 ได้ ID ห้องแชทมาแล้ว
+        matchId = matchRes.rows[0].id;
       
         io.to(`user_${myId}`).emit('new_notification', { type: 'match' });
         io.to(`user_${targetId}`).emit('new_notification', { type: 'match' });
@@ -108,6 +108,16 @@ export const getMyMatches = async (req: AuthRequest, res: Response) => {
         u.last_active_at,
         m.matched_at,
         (SELECT message_content FROM messages WHERE match_id = m.id ORDER BY sent_at DESC LIMIT 1) as last_message
+        p.bio as partner_bio,
+        p.birth_date as partner_birth_date,
+        m.matched_at,
+        (SELECT message_content FROM messages WHERE match_id = m.id ORDER BY sent_at DESC LIMIT 1) as last_message,
+        (
+          SELECT json_agg(json_build_object('id', g.id, 'name', g.game_name))
+          FROM user_game_interests ugi
+          JOIN games g ON ugi.game_id = g.id
+          WHERE ugi.user_id = u.id
+        ) as partner_games
       FROM matches m
       JOIN users u ON (u.id = m.user_one_id OR u.id = m.user_two_id) AND u.id != $1
       JOIN profiles p ON u.id = p.user_id
