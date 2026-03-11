@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { pool } from '../config/db.js';
 
 export interface AuthRequest extends Request {
   user?: { userId: number; name: string; isAdmin: boolean };
@@ -14,7 +15,20 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
   jwt.verify(token, process.env.JWT_SECRET || 'secret123', (err: any, user: any) => {
     if (err) return res.status(403).json({ message: 'Invalid Token' });
     req.user = user;
-    next();
+
+    // Check if user is banned (Force Logout)
+    pool.query(
+      'SELECT id FROM user_bans WHERE user_id = $1 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)',
+      [user.userId]
+    ).then(banResult => {
+      if (banResult.rows.length > 0) {
+        return res.status(403).json({ message: 'Account Banned', isBanned: true });
+      }
+      next();
+    }).catch(err => {
+      console.error('Middleware ban check error', err);
+      next(); // Fail open for safety or next(err) for strictness? Especificação implied strict.
+    });
   });
 };
 

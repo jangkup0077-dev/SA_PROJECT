@@ -29,8 +29,8 @@ const handleLogin = async () => {
   <div class="h-[80vh] flex items-center justify-center">
     <div class="bg-gray-900 p-8 rounded-3xl w-full max-w-md border border-white/5 shadow-2xl">
       <div class="mb-8 text-center">
-        <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400 tracking-tight">GameMatch</h1>
-        <p class="text-sm font-mono text-gray-500 mt-2 uppercase tracking-[0.2em]">Operations Portal</p>
+        <h1 class="text-3xl font-black tracking-tighter text-white">Squader <span class="text-indigo-500">HQ</span></h1>
+        <p class="text-zinc-500 text-sm font-medium mt-2">Administrative Command Center</p>
       </div>
 
       <form @submit.prevent="handleLogin" class="space-y-4">

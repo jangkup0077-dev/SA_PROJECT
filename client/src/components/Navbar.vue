@@ -17,10 +17,13 @@ const hideNavbar = computed(() => {
   return ['/login', '/setup-profile'].includes(route.path) || route.path.startsWith('/register') || route.path === '/'
 })
 
-const toggleNotifications = () => {
+const toggleNotifications = async () => {
   showNotifications.value = !showNotifications.value
   if (showNotifications.value) {
-    notificationStore.markAllAsRead()
+    // If we have unread notifications, mark them all as read on the backend
+    if (notificationStore.hasUnread) {
+      await notificationStore.markAllAsRead()
+    }
   }
 }
 
@@ -37,6 +40,8 @@ const handleClickOutside = (event: MouseEvent) => {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  // Fetch notification history
+  notificationStore.fetchNotifications()
 })
 
 onUnmounted(() => {
@@ -45,12 +50,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <nav v-if="!hideNavbar" class="w-full flex items-center justify-between px-6 py-4 bg-[rgba(255,255,255,0.03)] border-b border-[rgba(255,255,255,0.05)] sticky top-0 z-50 backdrop-blur-md">
-    <div class="flex items-center gap-2 cursor-pointer" @click="router.push('/discover')">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-purple-500/20">
+  <nav v-if="!hideNavbar" class="w-full flex items-center justify-between px-6 py-4 bg-gm-background border-b border-white/5 sticky top-0 z-50 shadow-md">
+    <div class="flex items-center gap-2 cursor-pointer group" @click="router.push('/discover')">
+      <div class="w-8 h-8 rounded-[8px] bg-gm-primary flex items-center justify-center font-bold text-white shadow-lg shadow-gm-primary/20 group-hover:bg-gm-hover group-hover:text-black transition duration-200">
         GM
       </div>
-      <span class="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+      <span class="text-xl font-bold tracking-tight text-white group-hover:text-gm-hover transition duration-200">
         GameMatch
       </span>
     </div>
@@ -58,8 +63,8 @@ onUnmounted(() => {
     <div class="flex items-center gap-6 text-gray-400">
       <button 
         @click="router.push('/discover')"
-        class="transition-colors hover:text-white"
-        :class="{ 'text-purple-400': route.path === '/discover' }"
+        class="transition-colors hover:text-gm-hover"
+        :class="{ 'text-gm-hover': route.path === '/discover' }"
       >
         <HomeIcon class="h-7 w-7" />
       </button>
@@ -67,22 +72,22 @@ onUnmounted(() => {
       
       <button 
         @click="router.push('/matches')"
-        class="transition-colors hover:text-white relative"
-        :class="{ 'text-purple-400': route.path.startsWith('/matches') || route.path.startsWith('/chat') }"
+        class="transition-colors hover:text-gm-hover relative"
+        :class="{ 'text-gm-hover': route.path.startsWith('/matches') || route.path.startsWith('/chat') }"
       >
         <ChatBubbleLeftIcon class="h-7 w-7" />
-        <span v-if="chatStore.hasUnread" class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-[var(--color-dark-bg)]"></span>
+        <span v-if="chatStore.hasUnread" class="absolute top-0 right-0 w-2 h-2 bg-gm-danger rounded-full border border-gm-background"></span>
       </button>
 
       <!-- Notification Bell Desktop -->
       <div class="relative" ref="dropdownRef">
         <button 
           @click.stop="toggleNotifications"
-          class="transition-colors hover:text-white relative"
-          :class="{ 'text-purple-400': showNotifications }"
+          class="transition-colors hover:text-gm-hover relative"
+          :class="{ 'text-gm-hover': showNotifications }"
         >
           <BellIcon class="h-7 w-7" />
-          <span v-if="notificationStore.hasUnread" class="absolute top-0 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[var(--color-dark-bg)] animate-pulse"></span>
+          <span v-if="notificationStore.hasUnread" class="absolute top-0 right-1 w-2.5 h-2.5 bg-gm-danger rounded-full border-2 border-gm-background animate-pulse"></span>
         </button>
 
         <!-- Notification Dropdown -->
@@ -94,7 +99,7 @@ onUnmounted(() => {
           leave-from-class="transform scale-100 opacity-100"
           leave-to-class="transform scale-95 opacity-0 m-0"
         >
-          <div v-if="showNotifications" class="absolute right-0 mt-3 w-80 bg-[#161B28]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[100]">
+          <div v-if="showNotifications" class="absolute right-0 mt-3 w-80 bg-gm-panel border border-white/10 rounded-[12px] shadow-[0_4px_20px_rgba(0,0,0,0.5)] overflow-hidden z-[100]">
             <div class="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
               <h3 class="font-bold text-white tracking-tight">Notifications</h3>
               <button 
@@ -124,6 +129,9 @@ onUnmounted(() => {
                   </div>
                   <div v-else-if="notif.type === 'message'" class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
                     <ChatBubbleLeftIcon class="w-5 h-5" />
+                  </div>
+                  <div v-else-if="notif.type === 'ACCOUNT_SUSPENDED' || notif.type === 'REPORT_UPDATE'" class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                   </div>
                   <div v-else class="w-10 h-10 rounded-full bg-gradient-to-br from-gray-500 to-slate-500 flex items-center justify-center text-white shadow-lg shadow-gray-500/20">
                     <BellIcon class="w-5 h-5" />

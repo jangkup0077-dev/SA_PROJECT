@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import api from '@/services/api'
 
 export interface NotificationItem {
   id: string
@@ -30,14 +31,38 @@ export const useNotificationStore = defineStore('notification', {
       }
       this.notifications.unshift(newNotification)
     },
-    markAsRead(id: string) {
-      const notification = this.notifications.find(n => n.id === id)
-      if (notification) {
-        notification.isRead = true
+    async fetchNotifications() {
+      try {
+        const res = await api.get('/notifications')
+        this.notifications = res.data.map((n: any) => ({
+          id: n.id.toString(),
+          type: n.type,
+          message: n.message,
+          isRead: n.is_read,
+          timestamp: n.created_at
+        }))
+      } catch (error) {
+        console.error('Failed to fetch notifications', error)
       }
     },
-    markAllAsRead() {
-      this.notifications.forEach(n => n.isRead = true)
+    async markAsRead(id: string) {
+      try {
+        await api.patch(`/notifications/${id}/read`)
+        const notification = this.notifications.find(n => n.id === id)
+        if (notification) {
+          notification.isRead = true
+        }
+      } catch (error) {
+        console.error('Failed to mark notification as read', error)
+      }
+    },
+    async markAllAsRead() {
+      try {
+        await api.patch('/notifications/read-all')
+        this.notifications.forEach(n => n.isRead = true)
+      } catch (error) {
+        console.error('Failed to mark all as read', error)
+      }
     },
     clearAll() {
       this.notifications = []

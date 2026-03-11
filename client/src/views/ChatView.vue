@@ -3,7 +3,6 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
-import { getSocket } from '@/services/socket'
 import api from '@/services/api'
 
 const route = useRoute()
@@ -17,90 +16,9 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const matchData = ref<any>(null)
 const showingUnmatchConfirm = ref(false)
 const showOptionsMenu = ref(false)
-const showingReportModal = ref(false)
-const reportReason = ref('')
-const reportDetails = ref('')
-const isSubmittingReport = ref(false)
-const reportMediaFile = ref<File | null>(null)
-const reportMediaPreview = ref('')
-const isUploadingReportMedia = ref(false)
-
-const handleUnmatch = () => {
-  showOptionsMenu.value = false
-  showingUnmatchConfirm.value = true
-}
-
-const handleReportRequest = () => {
-  showOptionsMenu.value = false
-  showingReportModal.value = true
-}
-
-const handleReportMediaFile = (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) {
-    reportMediaFile.value = file
-    reportMediaPreview.value = URL.createObjectURL(file)
-  }
-}
-
-const removeReportMedia = () => {
-  reportMediaFile.value = null
-  reportMediaPreview.value = ''
-}
-
-const submitReport = async () => {
-  if (!reportReason.value) return
-  
-  isSubmittingReport.value = true
-  try {
-    let mediaUrl = ''
-
-    // Upload media if attached
-    if (reportMediaFile.value) {
-      isUploadingReportMedia.value = true
-      const formData = new FormData()
-      formData.append('file', reportMediaFile.value)
-      const uploadRes = await api.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      mediaUrl = uploadRes.data.url || uploadRes.data.imageUrl || ''
-      isUploadingReportMedia.value = false
-    }
-
-    await api.post('/reports', {
-      reportedUserId: matchData.value?.target_id,
-      reason: reportReason.value,
-      description: reportDetails.value,
-      mediaUrl: mediaUrl || undefined
-    })
-    alert('Report submitted successfully. We will review it shortly.')
-    showingReportModal.value = false
-    reportReason.value = ''
-    reportDetails.value = ''
-    reportMediaFile.value = null
-    reportMediaPreview.value = ''
-  } catch (err) {
-    alert('Failed to submit report. Please try again.')
-  } finally {
-    isSubmittingReport.value = false
-    isUploadingReportMedia.value = false
-  }
-}
-
-const confirmUnmatch = async () => {
-  try {
-    await chatStore.unmatch(matchId)
-    router.push('/matches')
-  } catch (err) {
-    alert('Failed to unmatch. Please try again.')
-  }
-}
-
 const showInfo = ref(false)
 
-// ==========================================
-// Report
-// ==========================================
+// Report Modal States
 const showReportModal = ref(false)
 const reportTopic = ref('')
 const reportDesc = ref('')
@@ -117,6 +35,7 @@ const reportTopics = [
 ]
 
 const openReportModal = () => {
+  showOptionsMenu.value = false
   showInfo.value = false
   showReportModal.value = true
 }
@@ -133,7 +52,6 @@ const handleReportImageUpload = (e: Event) => {
   if (!target.files) return
 
   const newFiles = Array.from(target.files)
-
   if (reportImages.value.length + newFiles.length > 3) {
     alert('You can only upload up to 3 images as evidence.')
     return
@@ -148,12 +66,14 @@ const handleReportImageUpload = (e: Event) => {
   }
 
   reportImages.value.push(...newFiles)
-  target.value = '' // ล้างค่า input ให้กดเลือกรูปเดิมซ้ำได้
+  target.value = '' 
 }
 
 const removeReportImage = (index: number) => {
   reportImages.value.splice(index, 1)
 }
+
+const getObjectUrl = (file: File) => URL.createObjectURL(file)
 
 const submitReport = async () => {
   if (!reportTopic.value) return
@@ -164,11 +84,11 @@ const submitReport = async () => {
     
     for (const file of reportImages.value) {
       const formData = new FormData()
-      formData.append('image', file)
+      formData.append('file', file)
       const uploadRes = await api.post('/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
-      uploadedUrls.push(uploadRes.data.imageUrl)
+      uploadedUrls.push(uploadRes.data.url)
     }
 
     await api.post('/profile/report', {
@@ -182,7 +102,7 @@ const submitReport = async () => {
     closeReportModal()
     
     if(confirm('Would you like to unmatch with this user as well?')) {
-      handleUnmatch()
+      await handleUnmatch()
     }
   } catch (err) {
     console.error('Failed to submit report', err)
@@ -192,9 +112,23 @@ const submitReport = async () => {
   }
 }
 
-// ==========================================
-// Chat
-// ==========================================
+// Unmatch logic
+const handleUnmatch = async () => {
+  showOptionsMenu.value = false
+  showingUnmatchConfirm.value = true
+}
+
+const confirmUnmatch = async () => {
+  try {
+    await api.put(`/swipe/unmatch/${matchId}`)
+    router.push('/matches')
+  } catch (err) {
+    console.error('Failed to unmatch', err)
+    alert('Could not unmatch. Please try again.')
+  }
+}
+
+// Chat logic
 const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) {
@@ -257,10 +191,6 @@ const formatTime = (dateStr: string) => {
 }
 
 const groupedMessages = computed(() => {
-  const currentUserId = authStore.user?.id || (authStore.user as any)?.user_id
-  return chatStore.messages.map(msg => ({
-    ...msg,
-    isSelf: Number(msg.sender_id) === Number(currentUserId),
   const myId = Number(authStore.user?.id || (authStore.user as any)?.user_id)
   return chatStore.messages.map(msg => ({
     ...msg,
@@ -269,53 +199,27 @@ const groupedMessages = computed(() => {
   }))
 })
 
-const openImage = (url: string) => {
-  window.open(url, '_blank')
-}
-
 const send = () => {
-  if (!messageInput.value.trim()) return
-
-  chatStore.sendMessage(matchId, messageInput.value)
-
-  chatStore.sendMessage(matchId, messageInput.value.trim())
+  const txt = messageInput.value.trim()
+  if (!txt) return
+  chatStore.sendMessage(matchId, txt)
   messageInput.value = ''
   scrollToBottom()
 }
 
-const handleUnmatch = async () => {
-  if (!confirm('Are you sure you want to unmatch? This action cannot be undone.')) return
-  try {
-    await api.put(`/swipe/unmatch/${matchId}`)
-    router.push('/matches')
-  } catch (err) {
-    console.error('Failed to unmatch', err)
-    alert('Could not unmatch. Please try again.')
-  }
+const avatarFallbackError = (e: Event) => {
+  (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=User&background=random'
 }
-
-// Helper สร้าง URL สำหรับ Preview รูปก่อนอัปโหลด
-const getObjectUrl = (file: File) => URL.createObjectURL(file)
 </script>
 
 <template>
-  <div class="flex flex-col h-full absolute inset-0 bg-[#0A0D14] overflow-hidden">
-    <!-- Animated Background Pulse -->
-    <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px] animate-pulse"></div>
-    <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/10 rounded-full blur-[120px] animate-pulse" style="animation-delay: 1s"></div>
-
+  <div class="flex flex-col h-full absolute inset-0 bg-gm-background overflow-hidden">
     <!-- Chat Header -->
-    <div class="relative flex items-center justify-between px-4 py-4 bg-white/[0.02] backdrop-blur-xl border-b border-white/5 shrink-0 z-20">
+    <div class="relative flex items-center justify-between px-4 py-4 bg-gm-panel border-b border-white/5 shrink-0 z-20 shadow-md">
       <div class="flex items-center gap-3">
         <button
           @click="router.push('/matches')"
           class="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all active:scale-95 cursor-pointer"
-  <div class="flex flex-col h-full absolute inset-0 bg-[var(--color-dark-bg)]">
-    <div class="flex items-center justify-between px-4 py-3 bg-white/[0.03] border-b border-white/5 shrink-0 z-10">
-      <div class="flex items-center gap-3">
-        <button
-          @click="router.push('/matches')"
-          class="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -328,13 +232,10 @@ const getObjectUrl = (file: File) => URL.createObjectURL(file)
         >
           <div class="relative">
             <div class="w-11 h-11 rounded-full overflow-hidden p-[2px] bg-gradient-to-tr from-purple-500 to-indigo-500 group-hover:from-purple-400 group-hover:to-indigo-400 transition-all">
-              <div class="w-full h-full rounded-full overflow-hidden bg-gray-900">
-                <img :src="matchData?.target_avatar || '/placeholder-avatar.png'" class="w-full h-full object-cover" />
+              <div class="w-full h-full rounded-full overflow-hidden bg-gray-900 border border-black/50">
+                <img :src="matchData?.target_avatar || 'https://ui-avatars.com/api/?name=User&background=random'" @error="avatarFallbackError" class="w-full h-full object-cover" />
               </div>
             </div>
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-full overflow-hidden border-2 border-purple-500/30 bg-[var(--color-input-bg)]">
-            <img :src="matchData?.target_avatar || '/placeholder-avatar.png'" class="w-full h-full object-cover" />
           </div>
           <div class="flex flex-col">
             <span class="font-bold text-white text-[16px] tracking-tight leading-tight group-hover:text-purple-400 transition-colors">{{ matchData?.target_name || 'Match' }}</span>
@@ -342,161 +243,23 @@ const getObjectUrl = (file: File) => URL.createObjectURL(file)
         </router-link>
       </div>
 
-      <div class="relative">
+      <div class="flex gap-2">
         <button 
-          @click="showOptionsMenu = !showOptionsMenu"
-          class="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all active:scale-95 cursor-pointer"
+          @click="showInfo = true" 
+          class="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          title="Match Options & Profile"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
         </button>
-
-        <!-- Dropdown Menu -->
-        <Transition name="fade">
-          <div v-if="showOptionsMenu" 
-               @click.away="showOptionsMenu = false"
-               class="absolute right-0 mt-2 w-48 py-2 bg-[#1A1F2E]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-[60]">
-            <button 
-              @click="handleReportRequest"
-              class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-gray-300 hover:bg-white/5 transition-colors"
-            >
-              <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Report User
-            </button>
-            <div class="h-px bg-white/5 mx-2 my-1"></div>
-            <button 
-              @click="handleUnmatch"
-              class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm text-rose-400 hover:bg-rose-500/5 transition-colors"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
-              Unmatch
-            </button>
-          </div>
-        </Transition>
       </div>
     </div>
 
-    <!-- Confirmation Modal -->
-    <Transition name="fade">
-      <div v-if="showingUnmatchConfirm" class="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md">
-        <div class="bg-[#121620] border border-white/10 p-8 rounded-[32px] w-full max-w-sm shadow-2xl scale-in">
-          <div class="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center mx-auto mb-6">
-            <svg class="w-8 h-8 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </div>
-          <h3 class="text-2xl font-black text-white text-center mb-3">Break the link?</h3>
-          <p class="text-gray-400 text-sm text-center mb-8 leading-relaxed px-2">
-            This will permanently remove <b>{{ matchData?.target_name }}</b> from your matches and delete the conversation.
-          </p>
-          <div class="flex flex-col gap-3">
-            <button 
-              @click="confirmUnmatch"
-              class="w-full py-4 rounded-2xl bg-rose-600 text-white font-bold hover:bg-rose-500 transition-all active:scale-95 cursor-pointer shadow-lg shadow-rose-900/20"
-            >
-              Unmatch Now
-            </button>
-            <button 
-              @click="showingUnmatchConfirm = false"
-              class="w-full py-4 rounded-2xl bg-white/5 text-gray-400 font-semibold hover:bg-white/10 transition-all cursor-pointer"
-            >
-              Actually, wait
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Report Modal -->
-    <Transition name="fade">
-      <div v-if="showingReportModal" class="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md">
-        <div class="bg-[#121620] border border-white/10 p-8 rounded-[32px] w-full max-w-md shadow-2xl scale-in">
-          <div class="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-6">
-            <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h3 class="text-2xl font-black text-white text-center mb-3">Report User</h3>
-          <p class="text-gray-400 text-sm text-center mb-6 px-2">
-            Tell us why you are reporting <b>{{ matchData?.target_name }}</b>. Your safety is our priority.
-          </p>
-          
-          <div class="space-y-4 mb-8">
-            <div class="flex flex-wrap gap-2 justify-center">
-              <button 
-                v-for="reason in ['Harassment', 'Spam', 'Fake Profile', 'Inappropriate Content', 'Other']"
-                :key="reason"
-                @click="reportReason = reason"
-                class="px-4 py-2 rounded-xl text-xs font-bold transition-all border"
-                :class="reportReason === reason 
-                  ? 'bg-amber-500 border-amber-500 text-black shadow-lg shadow-amber-500/20' 
-                  : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'"
-              >
-                {{ reason }}
-              </button>
-            </div>
-            
-            <textarea 
-              v-model="reportDetails"
-              placeholder="Provide more details (optional)..."
-              class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:border-amber-500 transition-colors h-24 resize-none"
-            ></textarea>
-
-            <!-- Media Evidence Upload -->
-            <div>
-              <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Attach Evidence (optional)</label>
-              <div v-if="!reportMediaPreview" class="relative">
-                <input 
-                  type="file" 
-                  accept="image/*,video/*" 
-                  @change="handleReportMediaFile"
-                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <div class="flex items-center justify-center gap-2 w-full py-3 bg-white/5 border border-dashed border-white/20 rounded-2xl text-gray-400 text-sm hover:bg-white/10 transition-colors">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span>Upload image or video</span>
-                </div>
-              </div>
-              <div v-else class="relative rounded-2xl overflow-hidden border border-white/10">
-                <img v-if="reportMediaFile?.type.startsWith('image')" :src="reportMediaPreview" class="w-full h-32 object-cover" />
-                <video v-else :src="reportMediaPreview" class="w-full h-32 object-cover" />
-                <button @click="removeReportMedia" class="absolute top-2 right-2 w-7 h-7 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-red-500 transition-colors">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-3">
-            <button 
-              @click="submitReport"
-              :disabled="!reportReason || isSubmittingReport"
-              class="w-full py-4 rounded-2xl bg-amber-500 text-black font-extrabold hover:bg-amber-400 transition-all active:scale-95 disabled:opacity-30 disabled:grayscale cursor-pointer shadow-lg shadow-amber-900/20"
-            >
-              {{ isSubmittingReport ? 'Submitting...' : 'Submit Report' }}
-            </button>
-            <button 
-              @click="showingReportModal = false"
-              class="w-full py-4 rounded-2xl bg-white/5 text-gray-400 font-semibold hover:bg-white/10 transition-all cursor-pointer"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Messages -->
+    <!-- Messages Container -->
     <div ref="messagesContainer" class="flex-grow overflow-y-auto px-4 py-6 flex flex-col gap-6 custom-scrollbar relative z-10">
       <div v-if="chatStore.messages.length === 0" class="flex-grow flex flex-col items-center justify-center text-center">
-        <div class="w-20 h-20 rounded-full bg-white/[0.03] flex items-center justify-center mb-4">
+        <div class="w-20 h-20 rounded-full bg-white/[0.03] flex items-center justify-center mb-4 border border-white/5">
           <span class="text-4xl">👋</span>
         </div>
         <h4 class="text-white font-bold mb-1">Start the magic</h4>
@@ -506,50 +269,25 @@ const getObjectUrl = (file: File) => URL.createObjectURL(file)
       <template v-for="(msg, idx) in groupedMessages" :key="msg.id">
         <div class="flex w-full group" :class="msg.isSelf ? 'justify-end' : 'justify-start'">
           <div class="flex items-end gap-2 max-w-[85%]" :class="msg.isSelf ? 'flex-row-reverse' : 'flex-row'">
-            <!-- Avatar (Small Messenger Style) -->
+            
             <div 
               v-if="!msg.isSelf" 
               class="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/10 shadow-sm self-end mb-1"
-      <button 
-        @click="showInfo = true" 
-        class="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-      >
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-        </svg>
-      </button>
-    </div>
-
-    <div ref="messagesContainer" class="flex-grow overflow-y-auto px-4 py-4 flex flex-col gap-2">
-      <div v-if="chatStore.messages.length === 0" class="flex-grow flex flex-col items-center justify-center text-center text-gray-500">
-        <p class="text-sm">No messages yet. Say hi! 👋</p>
-      </div>
-
-      <template v-for="(msg, idx) in groupedMessages" :key="msg.id">
-        <div class="flex w-full" :class="msg.isSelf ? 'justify-end' : 'justify-start'">
-          <div class="flex flex-col max-w-[75%]" :class="msg.isSelf ? 'items-end' : 'items-start'">
-            <div
-              class="px-[18px] py-[14px] text-[15px] text-left leading-[1.5] shadow-[0_2px_6px_rgba(0,0,0,0.03)] whitespace-pre-wrap [word-break:break-word]"
-              :class="[
-                msg.isSelf
-                  ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-[18px] rounded-br-[4px]'
-                  : 'bg-white/[0.08] text-gray-100 rounded-[18px] rounded-bl-[4px] border border-white/[0.05]'
-              ]"
             >
               <img 
-                :src="matchData?.target_avatar || '/placeholder-avatar.png'" 
+                :src="matchData?.target_avatar || 'https://ui-avatars.com/api/?name=User&background=random'" 
+                @error="avatarFallbackError"
                 class="w-full h-full object-cover" 
               />
             </div>
 
             <div class="flex flex-col" :class="msg.isSelf ? 'items-end' : 'items-start'">
               <div
-                class="relative px-4 py-2.5 text-[15px] leading-relaxed shadow-xl transition-all w-fit max-w-full"
-                style="word-wrap: break-word; white-space: pre-wrap; min-width: 50px;"
+                class="relative px-4 py-2.5 text-[15px] leading-relaxed shadow-md w-fit max-w-full whitespace-pre-wrap text-white transition duration-200"
                 :class="[
                   msg.isSelf
-                    ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-2xl rounded-br-sm'
-                    : 'bg-white/[0.08] backdrop-blur-md text-gray-100 rounded-2xl rounded-bl-sm border border-white/5'
+                    ? 'bg-gm-primary rounded-[18px] rounded-br-[4px]'
+                    : 'bg-gm-panel rounded-[18px] rounded-bl-[4px] border border-white/5'
                 ]"
               >
                 {{ msg.message_content }}
@@ -567,184 +305,218 @@ const getObjectUrl = (file: File) => URL.createObjectURL(file)
       </template>
     </div>
 
-    <!-- Input Bar -->
-    <div class="px-4 py-6 bg-gradient-to-t from-[#0A0D14] via-[#0A0D14]/95 to-transparent shrink-0 relative z-20">
-      <form @submit.prevent="send" class="relative max-w-2xl mx-auto group">
-        <div class="absolute -inset-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-[24px] blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
-        <div class="relative flex items-center gap-2 bg-[#161B28]/80 backdrop-blur-2xl border border-white/10 rounded-[24px] p-2 pl-5 pr-2">
+    <div class="px-4 py-6 bg-gm-background shrink-0 relative z-20">
+      <div v-if="authStore.user?.is_suspended" class="max-w-2xl mx-auto mb-4 bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center gap-3">
+        <svg class="w-5 h-5 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        <p class="text-xs font-bold text-red-400">Account Restricted: You cannot send messages while suspended.</p>
+      </div>
+      <form @submit.prevent="send" class="relative max-w-2xl mx-auto group" :class="{ 'opacity-50 pointer-events-none': authStore.user?.is_suspended }">
+        <div class="relative flex items-center gap-2 bg-gm-panel border border-transparent focus-within:border-gm-hover transition duration-200 rounded-[24px] p-2 pl-5 pr-2 shadow-lg">
           <input
             v-model="messageInput"
             type="text"
-            placeholder="Write a message..."
+            :placeholder="authStore.user?.is_suspended ? 'Messaging disabled' : 'Write a message...'"
+            :disabled="authStore.user?.is_suspended"
             class="flex-grow bg-transparent border-none outline-none text-white placeholder-gray-500 text-sm py-2"
           />
           <button
             type="submit"
-            :disabled="!messageInput.trim()"
-            class="w-10 h-10 rounded-2xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/20 transition-all hover:scale-110 active:scale-90 disabled:grayscale disabled:opacity-30 cursor-pointer"
+            :disabled="!messageInput.trim() || authStore.user?.is_suspended"
+            class="w-10 h-10 rounded-2xl flex items-center justify-center bg-gm-primary text-white shadow-md transition duration-200 hover:bg-gm-hover hover:text-black active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             <svg class="w-5 h-5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
             </svg>
           </button>
         </div>
-    <div class="px-4 py-3 bg-white/[0.02] border-t border-white/5 shrink-0">
-      <form @submit.prevent="send" class="flex gap-2 items-center max-w-lg mx-auto w-full">
-        <input
-          v-model="messageInput"
-          type="text"
-          placeholder="Message..."
-          @keydown.enter.prevent="send"
-          class="flex-grow px-4 py-3 bg-[var(--color-input-bg)] border border-white/5 rounded-2xl outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-white placeholder-gray-400 text-sm transition-all"
-        />
-        <button
-          type="submit"
-          :disabled="!messageInput.trim()"
-          class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white hover:bg-purple-500 transition-colors disabled:opacity-30 disabled:bg-white/10 disabled:text-gray-500 cursor-pointer shrink-0"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5m-7 7l7-7 7 7" />
-          </svg>
-        </button>
       </form>
     </div>
 
-    <div 
-      v-if="showInfo" 
-      class="fixed inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" 
-      @click.self="showInfo = false"
-    >
-      <div class="w-full max-w-sm bg-[var(--color-dark-bg)] border border-white/10 rounded-3xl p-6 flex flex-col shadow-2xl relative">
-        <button 
-          @click="showInfo = false" 
-          class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
-        >
-           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
+    <!-- Modals -->
 
-        <div class="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-purple-500/30 mb-4 bg-[var(--color-input-bg)] shadow-[0_0_20px_rgba(124,58,237,0.15)]">
-          <img :src="matchData?.target_avatar || '/placeholder-avatar.png'" class="w-full h-full object-cover" />
-        </div>
-
-        <h3 class="text-xl font-bold text-center text-white flex items-center justify-center gap-2">
-          {{ matchData?.target_name || 'Match' }}
-          <span v-if="targetAge" class="text-gray-400 font-normal text-lg">{{ targetAge }}</span>
-        </h3>
-
-        <div class="mt-4 bg-white/[0.03] border border-white/5 rounded-2xl p-4 min-h-[60px] flex items-center justify-center">
-          <p class="text-sm text-gray-300 leading-relaxed text-center">
-            {{ matchData?.target_bio || 'No bio provided.' }}
-          </p>
-        </div>
-
-        <div class="mt-5 mb-8">
-          <p class="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">Interested Games</p>
-          <div class="flex flex-wrap gap-2">
-            <span 
-              v-for="game in (matchData?.target_games || [])" 
-              :key="game.id" 
-              class="px-3 py-1 bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-lg text-xs font-semibold"
-            >
-              {{ game.name }}
-            </span>
-            <span v-if="!matchData?.target_games?.length" class="text-xs text-gray-500">No games selected.</span>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-2">
+    <!-- Info Profile Drawer -->
+    <Transition name="fade">
+      <div 
+        v-if="showInfo" 
+        class="fixed inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" 
+        @click.self="showInfo = false"
+      >
+        <div class="w-full max-w-sm bg-gm-panel border border-transparent rounded-[12px] p-6 flex flex-col shadow-[0_4px_20px_rgba(0,0,0,0.5)] relative scale-in">
           <button 
-            @click="handleUnmatch" 
-            class="w-full py-3 bg-white/5 text-gray-400 font-bold rounded-xl border border-white/10 hover:bg-white/10 hover:text-white transition-colors cursor-pointer text-sm"
+            @click="showInfo = false" 
+            class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
           >
-            Unmatch
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
-          <button 
-            @click="openReportModal" 
-            class="w-full py-3 bg-red-500/10 text-red-400 font-bold rounded-xl border border-red-500/20 hover:bg-red-500/20 transition-colors cursor-pointer text-sm"
-          >
-            Report User
-          </button>
-        </div>
-      </div>
-    </div>
 
-    <div 
-      v-if="showReportModal" 
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
-      @click.self="closeReportModal"
-    >
-      <div class="w-full max-w-sm bg-[var(--color-dark-bg)] border border-white/10 rounded-3xl p-6 flex flex-col shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        <button 
-          @click="closeReportModal" 
-          class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
-        >
-           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-
-        <h2 class="text-xl font-bold text-white mb-1">Report User</h2>
-        <p class="text-sm text-gray-400 mb-6">Tell us what happened with {{ matchData?.target_name }}.</p>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Topic <span class="text-red-400">*</span></label>
-            <select 
-              v-model="reportTopic"
-              class="w-full px-4 py-3.5 bg-[var(--color-input-bg)] border border-white/5 rounded-2xl outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/20 transition-all text-white text-sm"
-            >
-              <option value="" disabled>Select a reason...</option>
-              <option v-for="topic in reportTopics" :key="topic" :value="topic">{{ topic }}</option>
-            </select>
+          <div class="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-purple-500/30 mb-4 bg-[var(--color-input-bg)] shadow-[0_0_20px_rgba(124,58,237,0.15)]">
+            <img :src="matchData?.target_avatar || 'https://ui-avatars.com/api/?name=User&background=random'" @error="avatarFallbackError" class="w-full h-full object-cover" />
           </div>
 
-          <div>
-            <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Evidence (Max 3)</label>
-            <div class="flex flex-wrap gap-3">
-              <div 
-                v-for="(file, idx) in reportImages" 
-                :key="idx" 
-                class="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10 group bg-black"
-              >
-                <img :src="getObjectUrl(file)" class="w-full h-full object-cover opacity-80" />
-                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <button @click="removeReportImage(idx)" class="w-6 h-6 bg-red-500 rounded-full text-white flex items-center justify-center cursor-pointer">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-              </div>
+          <h3 class="text-xl font-bold text-center text-white flex items-center justify-center gap-2">
+            {{ matchData?.target_name || 'Match' }}
+            <span v-if="targetAge" class="text-gray-400 font-normal text-lg">{{ targetAge }}</span>
+          </h3>
 
-              <button 
-                v-if="reportImages.length < 3"
-                @click="() => reportFileInput?.click()"
-                class="w-20 h-20 rounded-xl border-2 border-dashed border-white/20 hover:border-red-500/50 hover:bg-white/5 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-gray-500"
+          <div class="mt-4 bg-white/[0.03] border border-white/5 rounded-2xl p-4 min-h-[60px] flex items-center justify-center">
+            <p class="text-sm text-gray-300 leading-relaxed text-center">
+              {{ matchData?.target_bio || 'No bio provided.' }}
+            </p>
+          </div>
+
+          <div class="mt-5 mb-8">
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">Interested Games</p>
+            <div class="flex flex-wrap gap-2">
+              <span 
+                v-for="game in (matchData?.target_games || [])" 
+                :key="game.id" 
+                class="px-3 py-1 bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-lg text-xs font-semibold"
               >
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                <span class="text-[10px] font-medium">Add Image</span>
-              </button>
-              
-              <input ref="reportFileInput" type="file" accept="image/*" multiple class="hidden" @change="handleReportImageUpload" />
+                {{ game.name }}
+              </span>
+              <span v-if="!matchData?.target_games?.length" class="text-xs text-gray-500">No games selected.</span>
             </div>
           </div>
 
-          <div>
-            <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Additional Details</label>
-            <textarea 
-              v-model="reportDesc"
-              rows="3"
-              placeholder="Provide more context..."
-              class="w-full px-4 py-3.5 bg-[var(--color-input-bg)] border border-white/5 rounded-2xl outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/20 transition-all text-white text-sm resize-none"
-            ></textarea>
+          <div class="flex flex-col gap-2">
+            <button 
+              @click="handleUnmatch" 
+              class="w-full py-3 bg-white/5 text-white font-semibold rounded-[12px] border border-transparent hover:bg-gm-hover hover:text-black transition duration-200 cursor-pointer text-sm shadow-md"
+            >
+              Unmatch
+            </button>
+            <button 
+              @click="openReportModal" 
+              class="w-full py-3 bg-gm-danger text-white font-bold rounded-[12px] border border-transparent hover:brightness-110 transition duration-200 cursor-pointer text-sm shadow-md"
+            >
+              Report User
+            </button>
           </div>
-
-          <button 
-            @click="submitReport"
-            :disabled="isSubmittingReport || !reportTopic"
-            class="w-full py-4 mt-2 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-2xl shadow-lg shadow-red-500/20 hover:shadow-red-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
-          >
-            {{ isSubmittingReport ? 'Uploading Evidence...' : 'Submit Report' }}
-          </button>
         </div>
       </div>
-    </div>
+    </Transition>
+
+    <!-- Unmatch Confirmation Modal -->
+    <Transition name="fade">
+      <div v-if="showingUnmatchConfirm" class="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md">
+        <div class="bg-gm-panel border border-transparent p-8 rounded-[12px] w-full max-w-sm shadow-[0_4px_20px_rgba(0,0,0,0.5)] scale-in">
+          <div class="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-gm-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </div>
+          <h3 class="text-2xl font-black text-white text-center mb-3">Break the link?</h3>
+          <p class="text-gray-400 text-sm text-center mb-8 leading-relaxed px-2">
+            This will permanently remove <b>{{ matchData?.target_name }}</b> from your matches and delete the conversation.
+          </p>
+          <div class="flex flex-col gap-3">
+            <button 
+              @click="confirmUnmatch"
+              class="w-full py-3 rounded-[12px] bg-gm-danger text-white font-bold hover:brightness-110 transition duration-200 active:scale-95 cursor-pointer shadow-md"
+            >
+              Unmatch Now
+            </button>
+            <button 
+              @click="showingUnmatchConfirm = false"
+              class="w-full py-3 rounded-[12px] bg-white/5 text-white font-semibold hover:bg-gm-hover hover:text-black transition duration-200 cursor-pointer"
+            >
+              Actually, wait
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Report Modal -->
+    <Transition name="fade">
+      <div v-if="showReportModal" class="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/80 backdrop-blur-md" @click.self="closeReportModal">
+        <div class="bg-gm-panel border border-transparent p-8 rounded-[12px] w-full max-w-md shadow-[0_4px_20px_rgba(0,0,0,0.5)] scale-in max-h-[90vh] overflow-y-auto relative">
+          <button 
+            @click="closeReportModal" 
+            class="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors cursor-pointer"
+          >
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+          <div class="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 class="text-2xl font-black text-white text-center mb-3">Report User</h3>
+          <p class="text-gray-400 text-sm text-center mb-6 px-2">
+            Tell us why you are reporting <b>{{ matchData?.target_name }}</b>. Your safety is our priority.
+          </p>
+          
+          <div class="space-y-4 mb-8">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Topic <span class="text-red-400">*</span></label>
+              <select 
+                v-model="reportTopic"
+                class="w-full px-4 py-3.5 bg-white/5 border border-white/5 rounded-2xl outline-none focus:border-red-500 transition-all text-white text-sm"
+              >
+                <option value="" disabled class="bg-gray-900 text-gray-500">Select a reason...</option>
+                <option v-for="topic in reportTopics" :key="topic" :value="topic" class="bg-gray-900 text-white">{{ topic }}</option>
+              </select>
+            </div>
+            
+            <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 pt-2">Evidence (Max 3)</label>
+              <div class="flex flex-wrap gap-3">
+                <div 
+                  v-for="(file, idx) in reportImages" 
+                  :key="idx" 
+                  class="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10 group bg-black"
+                >
+                  <img :src="getObjectUrl(file)" class="w-full h-full object-cover opacity-80" />
+                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button @click="removeReportImage(idx)" class="w-6 h-6 bg-red-500 rounded-full text-white flex items-center justify-center cursor-pointer border-none outline-none">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div 
+                  v-if="reportImages.length < 3"
+                  @click="() => reportFileInput?.click()"
+                  class="w-20 h-20 rounded-xl border-2 border-dashed border-white/20 hover:border-red-500/50 hover:bg-white/5 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer text-gray-500"
+                >
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                  <span class="text-[10px] font-medium">Add Image</span>
+                </div>
+                
+                <input ref="reportFileInput" type="file" accept="image/*" multiple class="hidden" @change="handleReportImageUpload" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 pt-2">Additional Details</label>
+              <textarea 
+                v-model="reportDesc"
+                placeholder="Provide more context..."
+                class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:border-amber-500 transition-colors h-24 resize-none"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <button 
+              @click="submitReport"
+              :disabled="!reportTopic || isSubmittingReport"
+              class="w-full py-3 rounded-[12px] bg-gm-primary text-white font-bold hover:bg-gm-hover hover:text-black transition duration-200 active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
+            >
+              {{ isSubmittingReport ? 'Uploading Evidence...' : 'Submit Report' }}
+            </button>
+            <button 
+              @click="closeReportModal"
+              class="w-full py-3 rounded-[12px] bg-white/5 text-white font-semibold hover:bg-gm-hover hover:text-black transition duration-200 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
@@ -783,15 +555,18 @@ const getObjectUrl = (file: File) => URL.createObjectURL(file)
   0%, 100% { opacity: 0.1; transform: scale(1); }
   50% { opacity: 0.15; transform: scale(1.1); }
 }
-</style>
-
-
 
 .animate-fade-in {
-  animation: fadeIn 0.2s ease-out forwards;
+  animation: fadeIn 0.15s ease-out forwards;
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* Fix dropdown options being translucent */
+select option {
+  background-color: var(--color-dark-bg);
+  color: white;
 }
 </style>

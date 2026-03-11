@@ -45,6 +45,18 @@ export const login = async (req: Request, res: Response) => {
 
     const user = userResult.rows[0];
 
+    // Check if user is banned
+    const banResult = await pool.query(
+      'SELECT * FROM user_bans WHERE user_id = $1 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)',
+      [user.id]
+    );
+    if (banResult.rows.length > 0) {
+      return res.status(403).json({ 
+        message: 'Account is permanently banned', 
+        reason: banResult.rows[0].reason 
+      });
+    }
+
     // Check if user is suspended
     if (user.is_suspended) {
       const suspensionUntil = new Date(user.suspension_until);

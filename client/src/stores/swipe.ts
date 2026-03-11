@@ -56,7 +56,6 @@ export const useSwipeStore = defineStore('swipe', {
                 this.loading = false
             }
         },
-        // แก้ไขฟังก์ชันนี้ใน src/stores/swipe.ts
         async registerSwipe(targetId: number, action: 'LIKE' | 'SKIP') {
             console.log(`[SWIPE START] Sending swipe action for targetId: ${targetId}, status: ${action}`)
             
@@ -66,7 +65,6 @@ export const useSwipeStore = defineStore('swipe', {
             const profileAvatar = (targetProfile?.profile_image_url && targetProfile.profile_image_url.length > 0) 
                 ? targetProfile.profile_image_url[0] 
                 : '';
-            const targetProfile = this.profiles.find(p => p.id === targetId);
 
             try {
                 const res = await api.post('/swipe', { targetId, status: action })

@@ -21,7 +21,7 @@ export class ReportService {
   }
 
   async updateReportStatus(reportId: number, status: string) {
-    const validStatuses = ['PENDING', 'REVIEWING', 'RESOLVED', 'REJECTED'];
+    const validStatuses = ['PENDING', 'REVIEWING', 'RESOLVED', 'REJECTED', 'DISMISSED'];
     if (!validStatuses.includes(status)) {
       throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }

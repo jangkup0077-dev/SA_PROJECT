@@ -7,7 +7,9 @@ export class NotificationService {
     const notification = await notificationRepository.createNotification(data);
     
     // 2. Emit real-time event if user is connected
-    io.to(data.userId.toString()).emit('notification', notification);
+    // Room name MUST match frontend join_global: user_${id}
+    // Event name MUST match frontend App.vue: new_notification
+    io.to(`user_${data.userId}`).emit('new_notification', notification);
 
     return notification;
   }

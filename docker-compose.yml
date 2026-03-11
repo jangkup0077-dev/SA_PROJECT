@@ -2,7 +2,7 @@ services:
   # 1. Database Service (PostgreSQL)
   db:
     image: postgres:15-alpine
-    container_name: game-match-db
+    container_name: squader-db
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -17,7 +17,7 @@ services:
   # 2. Backend Service (Node.js)
   server:
     build: ./server
-    container_name: game-match-server
+    container_name: squader-server
     ports:
       - "3000:3000"
     volumes:
@@ -35,7 +35,7 @@ services:
   # 3. Frontend Service (Vue.js)
   client:
     build: ./client
-    container_name: game-match-client
+    container_name: squader-client
     ports:
       - "5173:5173"
     volumes:
@@ -51,7 +51,7 @@ services:
   # 4. Admin Frontend Service (Vue.js)
   admin:
     build: ./admin
-    container_name: game-match-admin
+    container_name: squader-admin
     ports:
       - "5174:5174"
     volumes:

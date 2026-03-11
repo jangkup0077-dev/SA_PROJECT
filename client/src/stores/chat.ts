@@ -21,25 +21,6 @@ export const useChatStore = defineStore('chat', {
         async fetchMatches() {
             try {
                 const res = await api.get('/swipe/matches')
-                this.matchesList = res.data.map((m: any) => {
-                    // Normalize partner_images: pg can return TEXT[] as string "{url1,url2}"
-                    let images = m.partner_images
-                    if (typeof images === 'string') {
-                        images = images.replace(/^\{|\}$/g, '').split(',').filter(Boolean)
-                    }
-                    if (!Array.isArray(images)) images = []
-
-                    return {
-                        id: m.match_id,
-                        target_id: m.partner_id,
-                        target_name: m.partner_name,
-                        target_avatar: images.length > 0 ? images[0] : '',
-                        is_online: m.is_online,
-                        last_active_at: m.last_active_at,
-                        lastMessage: m.last_message,
-                        matched_at: m.matched_at
-                    }
-                })
                 this.matchesList = res.data.map((m: any) => ({
                     id: m.match_id,
                     target_id: m.partner_id,

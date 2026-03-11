@@ -7,6 +7,7 @@ export interface User {
     name: string
     email: string
     is_admin: boolean
+    is_suspended?: boolean
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -38,7 +39,8 @@ export const useAuthStore = defineStore('auth', {
                 const userData = res.data.user || res.data
                 this.user = {
                     ...userData,
-                    id: userData.id || userData.user_id
+                    id: userData.id || userData.user_id,
+                    is_suspended: userData.is_suspended
                 }
                 this.isAuthenticated = true
                 connectSocket(this.token!)

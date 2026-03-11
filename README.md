@@ -1,6 +1,6 @@
-# GameMatch
+# Squader
 
-GameMatch is a modern, web-based platform designed to help gamers find and match with other players based on shared interests and matching game titles. The platform brings the popular "swipe-to-match" interface into the gaming community, allowing players to connect, match, and chat in real-time.
+Squader is a modern, web-based platform designed to help gamers find and match with other players based on shared interests and matching game titles.
 
 ## Features
 

@@ -29,7 +29,7 @@ const profileImages = computed(() => {
   if (Array.isArray(imgs) && imgs.length > 0) {
     return imgs
   }
-  return ['/placeholder-avatar.png']
+  return ['https://ui-avatars.com/api/?name=User&background=random']
 })
 
 const avatarSrc = computed(() => {
@@ -48,13 +48,16 @@ const transformStyle = computed(() => {
   if (!props.isActive) return {}
 
   if (!isDragging.value && currentX.value === 0) {
-    return { transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' }
+    return {
+      transform: 'translate(0px, 0px) rotate(0deg) scale(1)',
+      transition: isTransitioning.value ? 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none'
+    }
   }
 
-  const rotate = (currentX.value / windowWidth.value) * 35
+  const rotate = (currentX.value / windowWidth.value) * 15
   return {
-    transform: `translate3d(${currentX.value}px, ${currentY.value}px, 0) rotate(${rotate}deg)`,
-    transition: isDragging.value ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)'
+    transform: `translate(${currentX.value}px, ${currentY.value}px) rotate(${rotate}deg)`,
+    transition: isTransitioning.value ? 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none'
   }
 })
 
@@ -137,7 +140,7 @@ onUnmounted(() => {
 <template>
   <div
     ref="cardRef"
-    class="absolute inset-0 w-full h-full overflow-hidden shadow-2xl bg-[#1e2330] flex flex-col will-change-transform select-none touch-none rounded-3xl border border-white/[0.06]"
+    class="absolute inset-0 w-full h-full overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.5)] bg-gm-panel flex flex-col will-change-transform select-none touch-none rounded-[12px] border border-transparent"
     :style="transformStyle"
     @pointerdown="onStart"
     @pointermove="onMove"

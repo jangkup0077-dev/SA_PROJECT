@@ -52,6 +52,16 @@ export const swipeUser = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Missing targetId or status' });
     }
 
+    // Check if requester is suspended
+    const userRes = await pool.query('SELECT is_suspended, suspension_until FROM users WHERE id = $1', [myId]);
+    const user = userRes.rows[0];
+    if (user?.is_suspended && new Date(user.suspension_until) > new Date()) {
+        return res.status(403).json({ 
+            message: 'Your account is suspended. You cannot swipe.',
+            suspension_until: user.suspension_until 
+        });
+    }
+
     const checkSwipe = await pool.query(
       'SELECT * FROM swipes WHERE requester_id = $1 AND target_id = $2',
       [myId, targetId]
@@ -105,11 +115,9 @@ export const getMyMatches = async (req: AuthRequest, res: Response) => {
         u.id as partner_id,
         p.display_name as partner_name,
         p.profile_image_url as partner_images,
-        u.last_active_at,
-        m.matched_at,
-        (SELECT message_content FROM messages WHERE match_id = m.id ORDER BY sent_at DESC LIMIT 1) as last_message
         p.bio as partner_bio,
         p.birth_date as partner_birth_date,
+        u.last_active_at,
         m.matched_at,
         (SELECT message_content FROM messages WHERE match_id = m.id ORDER BY sent_at DESC LIMIT 1) as last_message,
         (

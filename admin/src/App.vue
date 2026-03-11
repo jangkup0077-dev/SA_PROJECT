@@ -13,26 +13,27 @@ const logout = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-950 text-white flex flex-col">
-    <nav v-if="authStore.isAuthenticated" class="bg-gray-900 border-b border-white/10 px-6 py-4 flex items-center justify-between">
+  <div class="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col font-sans selection:bg-indigo-500/30">
+    <nav v-if="authStore.isAuthenticated" class="bg-[#09090b] border-b border-white/5 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
       <div class="flex items-center gap-8">
-        <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400 tracking-tight">
-          GameMatch<span class="text-white ml-2 text-sm font-mono opacity-50 block uppercase tracking-widest mt-0.5">Admin</span>
-        </h1>
-        <div class="flex gap-4">
-          <router-link to="/dashboard" class="px-3 py-2 rounded-lg transition-colors" :class="route.name === 'dashboard' ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:text-white'">Dashboard</router-link>
-          <router-link to="/users" class="px-3 py-2 rounded-lg transition-colors" :class="route.name === 'users' ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:text-white'">Users</router-link>
-          <router-link to="/reports" class="px-3 py-2 rounded-lg transition-colors" :class="route.name === 'reports' ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:text-white'">Reports</router-link>
-          <router-link to="/games" class="px-3 py-2 rounded-lg transition-colors" :class="route.name === 'games' ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:text-white'">Games</router-link>
+        <div class="p-6">
+          <h2 class="text-xl font-black tracking-tighter text-white">Squader <span class="text-[10px] bg-indigo-500 px-1.5 py-0.5 rounded ml-1 uppercase">HQ</span></h2>
+          <p class="text-[10px] font-bold text-zinc-500 mt-1 uppercase tracking-widest">Management Console</p>
+        </div>
+        <div class="flex gap-1.5 hidden md:flex">
+          <router-link to="/dashboard" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors" :class="route.name === 'dashboard' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'">Overview</router-link>
+          <router-link to="/users" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors" :class="route.name === 'users' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'">Users</router-link>
+          <router-link to="/reports" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors" :class="route.name === 'reports' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'">Reports</router-link>
+          <router-link to="/games" class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors" :class="route.name === 'games' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'">Platform Tags</router-link>
         </div>
       </div>
       <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-400">Signed in as <strong class="text-white">{{ authStore.admin?.name }}</strong></span>
-        <button @click="logout" class="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors">Logout</button>
+        <span class="text-sm text-zinc-400 hidden sm:inline">{{ authStore.admin?.name }}</span>
+        <button @click="logout" class="px-3 py-1.5 border border-white/5 hover:bg-white/5 rounded-md text-xs font-medium transition-colors text-zinc-300">Sign out</button>
       </div>
     </nav>
 
-    <main class="flex-grow p-8">
+    <main class="flex-grow p-6 md:p-10">
       <router-view />
     </main>
   </div>

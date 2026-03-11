@@ -174,7 +174,7 @@ export const submitReport = async (req: AuthRequest, res: Response) => {
     }
 
     await pool.query(
-      'INSERT INTO reports (reporter_user_id, reported_user_id, report_type, description, images) VALUES ($1, $2, $3, $4, $5)',
+      'INSERT INTO reports (reporter_id, reported_user_id, report_type, description, images) VALUES ($1, $2, $3, $4, $5)',
       [reporterId, reportedId, reportType, description, images || []]
     );
 

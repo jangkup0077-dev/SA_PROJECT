@@ -7,8 +7,11 @@ import api from '@/services/api'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const activeTab = ref<'reports' | 'users' | 'games'>('reports')
+const activeTab = ref<'reports' | 'users' | 'tags'>('reports')
 const loading = ref(false)
+
+// Action Dropdown State
+const activeDropdownUserId = ref<number | null>(null)
 
 // Data
 const reports = ref<any[]>([])
@@ -104,6 +107,73 @@ const suspendUser = async (userId: number) => {
   }
 }
 
+const banUser = async (userId: number) => {
+  const reason = prompt('Reason for permanent ban:')
+  if (!reason) return
+  if (!confirm('Are you sure you want to PERMANENTLY ban this user?')) return
+  try {
+    await api.post(`/admin/ban/${userId}`, { reason })
+    await fetchAll()
+    alert('User banned successfully')
+  } catch (err) {
+    alert('Failed to ban user')
+  }
+}
+
+const unbanUser = async (userId: number) => {
+  if (!confirm('Are you sure you want to lift the ban for this user?')) return
+  try {
+    await api.post(`/admin/unban/${userId}`)
+    await fetchAll()
+    alert('User unbanned successfully')
+  } catch (err) {
+    alert('Failed to unban user')
+  }
+}
+
+const warnUser = async (userId: number) => {
+  const reason = prompt('Warning reason:')
+  if (!reason) return
+  try {
+    await api.post(`/admin/warn/${userId}`, { reason })
+    alert('User warned successfully')
+  } catch (err) {
+    alert('Failed to warn user')
+  }
+}
+
+const unsuspendUser = async (userId: number) => {
+  if (!confirm('Are you sure you want to lift this user\'s suspension?')) return
+  try {
+    await api.post(`/admin/unsuspend/${userId}`)
+    await fetchAll()
+    alert('User unsuspended successfully')
+  } catch (err) {
+    alert('Failed to unsuspend user')
+  }
+}
+
+const updateSuspension = async (user: any) => {
+  const hours = prompt('New suspension duration (hours desde right now):', '24')
+  if (!hours) return
+  const reason = prompt('New/Updated reason (optional):', user.suspension_reason || '')
+  try {
+    await api.patch(`/suspend/${user.id}`, { hours: Number(hours), reason })
+    await fetchAll()
+    alert('Suspension updated')
+  } catch (err) {
+    alert('Failed to update suspension')
+  }
+}
+
+const toggleActionDropdown = (userId: number) => {
+  if (activeDropdownUserId.value === userId) {
+    activeDropdownUserId.value = null
+  } else {
+    activeDropdownUserId.value = userId
+  }
+}
+
 const formatDate = (iso: string) => {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -129,6 +199,10 @@ const getAvatarUrl = (images: any) => {
   if (Array.isArray(images)) return images[0] || ''
   return ''
 }
+
+const openExternal = (url: string) => {
+  window.open(url, '_blank')
+}
 </script>
 
 <template>
@@ -143,7 +217,7 @@ const getAvatarUrl = (images: any) => {
       <div class="flex items-center justify-between mb-8">
         <div>
           <h1 class="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-purple-200 to-indigo-300">Admin Dashboard</h1>
-          <p class="text-gray-500 text-sm mt-1">Manage users, reports, and games</p>
+          <p class="text-gray-500 text-sm mt-1">Manage users, reports, and platform tags</p>
         </div>
         <button @click="fetchAll" class="px-5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/10 transition-all">
           ↻ Refresh
@@ -173,7 +247,7 @@ const getAvatarUrl = (images: any) => {
       <!-- Tabs -->
       <div class="flex gap-1 bg-white/[0.03] border border-white/5 rounded-2xl p-1.5 mb-8">
         <button
-          v-for="tab in (['reports', 'users', 'games'] as const)"
+          v-for="tab in (['reports', 'users', 'tags'] as const)"
           :key="tab"
           @click="activeTab = tab"
           class="flex-1 py-3 rounded-xl text-sm font-bold transition-all capitalize"
@@ -181,7 +255,7 @@ const getAvatarUrl = (images: any) => {
             ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/20'
             : 'text-gray-500 hover:text-white hover:bg-white/5'"
         >
-          {{ tab }}
+          {{ tab === 'tags' ? 'Platform Tags' : tab }}
         </button>
       </div>
 
@@ -254,29 +328,69 @@ const getAvatarUrl = (images: any) => {
                 <img v-if="user.profile_image_url" :src="getAvatarUrl(user.profile_image_url)" class="w-full h-full object-cover" @error="($event.target as HTMLImageElement).style.display='none'" />
               </div>
               <div>
-                <p class="text-white font-bold text-sm">{{ user.display_name || user.name }}</p>
+                <div class="flex items-center gap-2">
+                  <p class="text-white font-bold text-sm">{{ user.display_name || user.name }}</p>
+                  <span v-if="user.is_admin" class="px-2 py-0.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] font-bold rounded-lg uppercase tracking-tighter">Admin</span>
+                </div>
                 <p class="text-gray-500 text-xs">{{ user.email }}</p>
+                <div v-if="user.is_suspended || user.is_banned" class="mt-1 flex gap-1 items-center">
+                  <span v-if="user.is_banned" class="text-[10px] text-white bg-red-600 px-1.5 py-0.5 rounded border border-red-700 font-bold uppercase">
+                    Banned
+                  </span>
+                  <span v-if="user.is_suspended" class="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">
+                    Suspended until {{ formatDate(user.suspension_until) }}
+                  </span>
+                </div>
               </div>
             </div>
-            <div class="flex items-center gap-3">
-              <span v-if="user.is_admin" class="px-2.5 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold rounded-lg">Admin</span>
-              <span v-if="user.is_suspended" class="px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg">Suspended</span>
+            <div class="flex items-center gap-3 relative">
               <button
-                v-if="!user.is_admin && !user.is_suspended"
-                @click="suspendUser(user.id)"
-                class="px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg hover:bg-red-500/20 transition-colors"
+                v-if="!user.is_admin"
+                @click.stop="toggleActionDropdown(user.id)"
+                class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
               >
-                Suspend
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
               </button>
+
+              <!-- Action Dropdown -->
+              <div v-if="activeDropdownUserId === user.id" class="absolute right-0 top-12 w-48 bg-[#161B26] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                <button @click="warnUser(user.id); activeDropdownUserId = null" class="w-full text-left px-4 py-3 text-xs font-bold text-amber-400 hover:bg-white/5 transition-colors border-b border-white/5">
+                  Send Warning
+                </button>
+                <template v-if="!user.is_banned">
+                  <button @click="banUser(user.id); activeDropdownUserId = null" class="w-full text-left px-4 py-3 text-xs font-bold text-red-600 hover:bg-white/5 transition-colors border-b border-white/5">
+                    Ban Permanently
+                  </button>
+                </template>
+                <template v-else>
+                  <button @click="unbanUser(user.id); activeDropdownUserId = null" class="w-full text-left px-4 py-3 text-xs font-bold text-green-500 hover:bg-white/5 transition-colors border-b border-white/5">
+                    Lift Permanent Ban
+                  </button>
+                </template>
+                
+                <template v-if="!user.is_suspended">
+                  <button @click="suspendUser(user.id); activeDropdownUserId = null" class="w-full text-left px-4 py-3 text-xs font-bold text-red-400 hover:bg-white/5 transition-colors">
+                    Suspend Account
+                  </button>
+                </template>
+                <template v-else>
+                  <button @click="updateSuspension(user); activeDropdownUserId = null" class="w-full text-left px-4 py-3 text-xs font-bold text-blue-400 hover:bg-white/5 transition-colors border-b border-white/5">
+                    Update Duration
+                  </button>
+                  <button @click="unsuspendUser(user.id); activeDropdownUserId = null" class="w-full text-left px-4 py-3 text-xs font-bold text-green-400 hover:bg-white/5 transition-colors">
+                    Lifting Suspension
+                  </button>
+                </template>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- GAMES TAB -->
-      <div v-if="activeTab === 'games'">
+      <!-- TAGS TAB -->
+      <div v-if="activeTab === 'tags'">
         <div v-if="games.length === 0" class="text-center py-16">
-          <p class="text-gray-500 text-lg font-medium">No games found</p>
+          <p class="text-gray-500 text-lg font-medium">No tags found</p>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div
@@ -285,7 +399,7 @@ const getAvatarUrl = (images: any) => {
             class="bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex items-center gap-4"
           >
             <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-indigo-500/20 flex items-center justify-center text-purple-400 font-bold text-lg shrink-0">
-              🎮
+              #
             </div>
             <div>
               <p class="text-white font-bold text-sm">{{ game.game_name }}</p>
@@ -354,7 +468,7 @@ const getAvatarUrl = (images: any) => {
                   v-if="selectedReport.media_url.match(/\.(jpg|jpeg|png|gif|webp)/i)"
                   :src="selectedReport.media_url"
                   class="w-full max-h-64 object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                  @click="window.open(selectedReport.media_url, '_blank')"
+                  @click="openExternal(selectedReport.media_url)"
                 />
                 <video
                   v-else

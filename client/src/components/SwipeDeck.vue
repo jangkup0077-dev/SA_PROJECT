@@ -22,15 +22,15 @@ const refreshProfiles = async () => {
 <template>
   <div class="relative w-full h-full">
     <!-- Loading -->
-    <div v-if="swipeStore.loading" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-[#0B0F1A] rounded-3xl">
-      <div class="w-14 h-14 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4"></div>
+    <div v-if="swipeStore.loading" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-gm-background rounded-[12px]">
+      <div class="w-14 h-14 border-4 border-gm-primary/30 border-t-gm-primary rounded-full animate-spin mb-4"></div>
       <p class="text-sm font-medium">Finding players near you...</p>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="swipeStore.profiles.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-[#0B0F1A] p-8 text-center rounded-3xl border border-white/5">
-      <div class="w-24 h-24 rounded-full bg-purple-500/10 flex items-center justify-center mb-5 border border-purple-500/20">
-        <svg class="w-12 h-12 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div v-else-if="swipeStore.profiles.length === 0" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-gm-background p-8 text-center rounded-[12px] border border-white/5">
+      <div class="w-24 h-24 rounded-full bg-gm-primary/10 flex items-center justify-center mb-5 border border-gm-primary/20">
+        <svg class="w-12 h-12 text-gm-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
         </svg>
       </div>
@@ -38,7 +38,7 @@ const refreshProfiles = async () => {
       <p class="text-sm text-gray-500 mb-6">You've swiped through all available players.<br/>Check back later or refresh!</p>
       <button
         @click="refreshProfiles"
-        class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-2xl hover:-translate-y-0.5 transition-all shadow-lg shadow-purple-500/20 text-sm cursor-pointer active:scale-95"
+        class="px-6 py-2.5 bg-gm-primary text-white font-semibold rounded-[12px] hover:bg-gm-hover hover:text-black transition duration-200 shadow-md text-sm cursor-pointer active:scale-95"
       >
         <span class="flex items-center gap-2">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
