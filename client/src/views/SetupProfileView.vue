@@ -25,15 +25,8 @@ onMounted(async () => {
     // Backend: GET /api/profile/all-games
     const res = await api.get('/profile/all-games')
     availableGames.value = res.data
-  } catch {
-    // Fallback mock games if endpoint fails
-    availableGames.value = [
-      { id: 1, game_name: 'Valorant' },
-      { id: 2, game_name: 'League of Legends' },
-      { id: 3, game_name: 'ROV' },
-      { id: 4, game_name: 'Apex' },
-      { id: 5, game_name: 'Fortnite' }
-    ]
+  } catch (err: any) {
+    errorMsg.value = 'Failed to load games. Please refresh the page.'
   }
 })
 
@@ -127,12 +120,13 @@ const handleSetup = async () => {
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-400 mb-1 ml-1" for="country">Country</label>
+            <label class="block text-sm font-medium text-gray-400 mb-1 ml-1" for="country">Country (Optional)</label>
             <input
               v-model="country"
               id="country"
               type="text"
-              class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-purple-500 transition-all text-white"
+              placeholder="Auto-detected if blank"
+              class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-purple-500 transition-all text-white placeholder-gray-500"
             />
           </div>
         </div>

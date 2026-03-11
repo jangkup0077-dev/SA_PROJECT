@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { pool } from '../config/db.js';
 import { AuthRequest } from '../middleware/authMiddleware.js';
+import geoip from 'geoip-lite';
 
 export const getAllGames = async (req: any, res: Response) => {
   try {
@@ -46,6 +47,18 @@ export const getMyProfile = async (req: AuthRequest, res: Response) => {
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
+    let { display_name, bio, country, age, profile_images } = req.body;
+
+    // Detect Country via IP if missing or requested
+    if (!country) {
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+      const geo = geoip.lookup(clientIp);
+      if (geo && geo.country) {
+         country = geo.country;
+      } else {
+         country = 'Unknown';
+      }
+    }
     const { display_name, bio, country, birth_date, profile_image_url } = req.body;
 
     await pool.query(`
@@ -82,6 +95,7 @@ export const updateMyGames = async (req: AuthRequest, res: Response) => {
     `, [userId, gameId]);
 
     res.json({ message: 'Game interest added successfully' });
+  } catch (err: any) {
   } catch (erro) {
     if (err.code === '23505') return res.status(400).json({ message: 'Game already added' });
     console.error(err);
