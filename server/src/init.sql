@@ -5,6 +5,9 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     is_admin BOOLEAN DEFAULT FALSE,
+    is_suspended BOOLEAN DEFAULT FALSE,
+    suspension_reason TEXT,
+    suspension_until TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -68,8 +71,44 @@ CREATE TABLE IF NOT EXISTS admin_logs (
     admin_id INT REFERENCES users(id) ON DELETE CASCADE,
     action VARCHAR(100) NOT NULL, -- เช่น delete_profile, banned_user
     target_id INT, -- เก็บ id ของคนที่โดนแบน หรือเกมที่ถูกเพิ่ม
+    reason TEXT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 9. สร้างตาราง Notifications
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL, -- MATCH_CREATED, NEW_MESSAGE, PROFILE_LIKED, REPORT_UPDATE, ACCOUNT_SUSPENDED
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    entity_id INT, -- ID ของสิ่งที่เกี่ยวข้อง (เช่น match_id, user_id, message_id)
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read);
+
+-- 10. สร้างตาราง Reports
+CREATE TABLE IF NOT EXISTS reports (
+    id SERIAL PRIMARY KEY,
+    reporter_id INT REFERENCES users(id) ON DELETE CASCADE,
+    reported_user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, REVIEWING, RESOLVED, REJECTED
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP
+);
+
+-- ==========================================
+-- Schema Migration for existing tables
+-- ==========================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_until TIMESTAMP;
+ALTER TABLE admin_logs ADD COLUMN IF NOT EXISTS reason TEXT;
 
 -- ==========================================
 -- Insert Mock Data (ข้อมูลตั้งต้นให้เทสได้เลย)

@@ -45,6 +45,17 @@ export const login = async (req: Request, res: Response) => {
 
     const user = userResult.rows[0];
 
+    // Check if user is suspended
+    if (user.is_suspended) {
+      const suspensionUntil = new Date(user.suspension_until);
+      if (suspensionUntil > new Date()) {
+        return res.status(403).json({ 
+          message: `Account is suspended until ${suspensionUntil.toLocaleString()}`, 
+          reason: user.suspension_reason 
+        });
+      }
+    }
+
     // 2. ตรวจสอบ Password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
@@ -60,6 +71,22 @@ export const login = async (req: Request, res: Response) => {
 
     res.json({ message: 'Login successful', token, user: { id: user.id, name: user.name, isAdmin: user.is_admin } });
 
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get current user (GET /auth/me)
+export const getMe = async (req: Request & { user?: any }, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const userResult = await pool.query('SELECT id, name, email, is_admin FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    res.json(userResult.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

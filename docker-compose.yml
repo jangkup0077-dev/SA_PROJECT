@@ -46,5 +46,19 @@ services:
     depends_on:
       - server
 
+  # 4. Admin Frontend Service (Vue.js)
+  admin:
+    build: ./admin
+    container_name: game-match-admin
+    ports:
+      - "5174:5174"
+    volumes:
+      - ./admin:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3000/api
+    depends_on:
+      - server
+
 volumes:
   pgdata:

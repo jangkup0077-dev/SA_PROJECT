@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { pool } from '../config/db.js';
 import { AuthRequest } from '../middleware/authMiddleware.js';
+import geoip from 'geoip-lite';
 
 // 1. ดึงรายชื่อเกมทั้งหมดในระบบ (เพื่อให้หน้า Register ดึงไปโชว์)
 export const getAllGames = async (req: any, res: Response) => {
@@ -49,7 +50,18 @@ export const getMyProfile = async (req: AuthRequest, res: Response) => {
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
-    const { display_name, bio, country, age, profile_images } = req.body;
+    let { display_name, bio, country, age, profile_images } = req.body;
+
+    // Detect Country via IP if missing or requested
+    if (!country) {
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+      const geo = geoip.lookup(clientIp);
+      if (geo && geo.country) {
+         country = geo.country;
+      } else {
+         country = 'Unknown';
+      }
+    }
 
     await pool.query(`
       INSERT INTO profiles (user_id, display_name, bio, country, age, profile_images)
@@ -86,7 +98,7 @@ export const updateMyGames = async (req: AuthRequest, res: Response) => {
     `, [userId, gameId]);
 
     res.json({ message: 'Game interest added successfully' });
-  } catch (err) {
+  } catch (err: any) {
     if (err.code === '23505') return res.status(400).json({ message: 'Game already added' });
     console.error(err);
     res.status(500).json({ message: 'Error adding game' });

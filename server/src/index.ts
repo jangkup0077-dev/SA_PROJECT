@@ -10,12 +10,15 @@ import uploadRoutes from './routes/uploadRoute.js';
 import swipeRoutes from './routes/swipeRoute.js';
 import chatRoutes from './routes/chatRoute.js';
 import adminRoutes from './routes/adminRoute.js';
+import reportRoutes from './routes/reportRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.set('trust proxy', true);
 
 connectDB();
 
@@ -32,6 +35,12 @@ export const io = new Server(httpServer, {
 
 io.on('connection', (socket) => {
   console.log('⚡ User connected:', socket.id);
+
+  // Users join their own room for targeted notifications
+  socket.on('register_user', (userId) => {
+    socket.join(userId.toString());
+    console.log(`User joined personal room: ${userId}`);
+  });
 
   socket.on('join_match', (matchId) => {
     socket.join(`match_${matchId}`);
@@ -51,6 +60,8 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/swipe', swipeRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/', (req, res) => {
   res.send('Game Match API is Ready!');
