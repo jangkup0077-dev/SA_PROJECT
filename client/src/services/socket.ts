@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client'
 
-const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'server-production-7a8f.up.railway.app/api'
+const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://server-production-7a8f.up.railway.app/api'
 
 let socket: Socket | null = null
 
