@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { pool } from '../config/db.js';
 import { AuthRequest } from '../middleware/authMiddleware.js';
+import geoip from 'geoip-lite';
 
 export const getAllGames = async (req: any, res: Response) => {
   try {
@@ -46,7 +47,18 @@ export const getMyProfile = async (req: AuthRequest, res: Response) => {
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
-    const { display_name, bio, country, birth_date, profile_image_url } = req.body;
+    let { display_name, bio, country, birth_date, profile_image_url } = req.body;
+
+    // Detect Country via IP if missing or requested
+    if (!country) {
+      const clientIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+      const geo = geoip.lookup(clientIp);
+      if (geo && geo.country) {
+         country = geo.country;
+      } else {
+         country = 'Unknown';
+      }
+    }
 
     await pool.query(`
       INSERT INTO profiles (user_id, display_name, bio, country, birth_date, profile_image_url)
@@ -82,7 +94,7 @@ export const updateMyGames = async (req: AuthRequest, res: Response) => {
     `, [userId, gameId]);
 
     res.json({ message: 'Game interest added successfully' });
-  } catch (erro) {
+  } catch (err: any) {
     if (err.code === '23505') return res.status(400).json({ message: 'Game already added' });
     console.error(err);
     res.status(500).json({ message: 'Error adding game' });
@@ -162,7 +174,7 @@ export const submitReport = async (req: AuthRequest, res: Response) => {
     }
 
     await pool.query(
-      'INSERT INTO reports (reporter_user_id, reported_user_id, report_type, description, images) VALUES ($1, $2, $3, $4, $5)',
+      'INSERT INTO reports (reporter_id, reported_user_id, report_type, description, images) VALUES ($1, $2, $3, $4, $5)',
       [reporterId, reportedId, reportType, description, images || []]
     );
 

@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     is_admin BOOLEAN DEFAULT FALSE,
+    is_suspended BOOLEAN DEFAULT FALSE,
+    suspension_reason TEXT,
+    suspension_until TIMESTAMP,
     last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -44,7 +47,7 @@ CREATE TABLE IF NOT EXISTS swipes (
     id SERIAL PRIMARY KEY,
     requester_id INT REFERENCES users(id) ON DELETE CASCADE,
     target_id INT REFERENCES users(id) ON DELETE CASCADE,
-    status VARCHAR(10) CHECK (status IN ('LIKE', 'SKIP')), 
+    status VARCHAR(10) CHECK (status IN ('LIKE', 'SKIP')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -66,37 +69,56 @@ CREATE TABLE IF NOT EXISTS messages (
     message_type VARCHAR(20) DEFAULT 'TEXT',
     message_content TEXT NOT NULL,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    read_at TIMESTAMP 
+    read_at TIMESTAMP
 );
 
--- 8. สร้างตาราง User Bans 
+-- 8. สร้างตาราง User Bans
 CREATE TABLE IF NOT EXISTS user_bans (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id) ON DELETE CASCADE,
     admin_id INT REFERENCES users(id) ON DELETE SET NULL,
     reason TEXT NOT NULL,
     banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP -- ถ้าเป็น NULL คือแบนถาวร
+    expires_at TIMESTAMP
 );
 
 -- 9. สร้างตาราง Reports
 CREATE TABLE IF NOT EXISTS reports (
     id SERIAL PRIMARY KEY,
-    reporter_user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    reporter_id INT REFERENCES users(id) ON DELETE CASCADE,
     reported_user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(255),
     report_type VARCHAR(50) NOT NULL,
 	images TEXT[] DEFAULT '{}',
     description TEXT,
-    status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'RESOLVED', 'DISMISSED')),
+    media_url TEXT,
+    status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'REVIEWING', 'RESOLVED', 'REJECTED', 'DISMISSED')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP
+);
+
+-- 10. สร้างตาราง Notifications
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    entity_id INT,
+    is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 10. สร้างตาราง Admin Logs
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read);
+
+-- 11. สร้างตาราง Admin Logs
 CREATE TABLE IF NOT EXISTS admin_logs (
     id SERIAL PRIMARY KEY,
     admin_id INT REFERENCES users(id) ON DELETE SET NULL,
-    target_id INT, 
-    action VARCHAR(50) NOT NULL, 
+    action VARCHAR(100) NOT NULL,
+    target_id INT,
+    reason TEXT,
     details TEXT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -107,63 +129,66 @@ CREATE TABLE IF NOT EXISTS admin_logs (
 
 -- Insert Games
 INSERT INTO games (game_name, game_icon_url) VALUES 
-('Arena of Valor (ROV)', 'https://example.com/rov.png'),
-('Valorant', 'https://example.com/valorant.png'),
-('Genshin Impact', 'https://example.com/genshin.png')
-('Fortnite', 'https://example.com/fortnite.png'),
-('PUBG Mobile', 'https://example.com/pubg_mobile.png'),
-('Free Fire', 'https://example.com/free_fire.png'),
-('Call of Duty: Mobile', 'https://example.com/cod_mobile.png'),
-('Minecraft', 'https://example.com/minecraft.png'),
-('Roblox', 'https://example.com/roblox.png'),
-('League of Legends', 'https://example.com/lol.png'),
-('League of Legends: Wild Rift', 'https://example.com/wild_rift.png'),
-('Mobile Legends: Bang Bang', 'https://example.com/mobile_legends.png'),
-('Honor of Kings', 'https://example.com/honor_of_kings.png'),
-('Dota 2', 'https://example.com/dota2.png'),
-('Counter-Strike 2', 'https://example.com/cs2.png'),
-('Apex Legends', 'https://example.com/apex_legends.png'),
-('Among Us', 'https://example.com/among_us.png'),
-('Clash of Clans', 'https://example.com/clash_of_clans.png'),
-('Clash Royale', 'https://example.com/clash_royale.png'),
-('Brawl Stars', 'https://example.com/brawl_stars.png'),
-('Stumble Guys', 'https://example.com/stumble_guys.png'),
-('Fall Guys', 'https://example.com/fall_guys.png'),
-('Rocket League', 'https://example.com/rocket_league.png'),
-('Warframe', 'https://example.com/warframe.png'),
-('Destiny 2', 'https://example.com/destiny2.png'),
-('World of Warcraft', 'https://example.com/wow.png'),
-('Final Fantasy XIV', 'https://example.com/ffxiv.png'),
-('Albion Online', 'https://example.com/albion_online.png'),
-('Black Desert Online', 'https://example.com/black_desert_online.png'),
-('Tower of Fantasy', 'https://example.com/tower_of_fantasy.png'),
-('Lost Ark', 'https://example.com/lost_ark.png'),
-('ARK: Survival Evolved', 'https://example.com/ark.png'),
-('Rust', 'https://example.com/rust.png'),
-('DayZ', 'https://example.com/dayz.png'),
+('Arena of Valor (ROV)', 'https://ui-avatars.com/api/?name=ROV&background=random'),
+('Valorant', 'https://ui-avatars.com/api/?name=Valorant&background=random'),
+('Genshin Impact', 'https://ui-avatars.com/api/?name=Genshin&background=random'),
+('Fortnite', 'https://ui-avatars.com/api/?name=Fortnite&background=random'),
+('PUBG Mobile', 'https://ui-avatars.com/api/?name=PUBG&background=random'),
+('Free Fire', 'https://ui-avatars.com/api/?name=Free_Fire&background=random'),
+('Call of Duty: Mobile', 'https://ui-avatars.com/api/?name=CODM&background=random'),
+('Minecraft', 'https://ui-avatars.com/api/?name=Minecraft&background=random'),
+('Roblox', 'https://ui-avatars.com/api/?name=Roblox&background=random'),
+('League of Legends', 'https://ui-avatars.com/api/?name=LOL&background=random'),
+('League of Legends: Wild Rift', 'https://ui-avatars.com/api/?name=Wild_Rift&background=random'),
+('Mobile Legends: Bang Bang', 'https://ui-avatars.com/api/?name=MLBB&background=random'),
+('Honor of Kings', 'https://ui-avatars.com/api/?name=HOK&background=random'),
+('Dota 2', 'https://ui-avatars.com/api/?name=Dota2&background=random'),
+('Counter-Strike 2', 'https://ui-avatars.com/api/?name=CS2&background=random'),
+('Apex Legends', 'https://ui-avatars.com/api/?name=Apex&background=random'),
+('Among Us', 'https://ui-avatars.com/api/?name=Among_Us&background=random'),
+('Clash of Clans', 'https://ui-avatars.com/api/?name=COC&background=random'),
+('Clash Royale', 'https://ui-avatars.com/api/?name=CR&background=random'),
+('Brawl Stars', 'https://ui-avatars.com/api/?name=Brawl&background=random'),
+('Stumble Guys', 'https://ui-avatars.com/api/?name=Stumble&background=random'),
+('Fall Guys', 'https://ui-avatars.com/api/?name=Fall_Guys&background=random'),
+('Rocket League', 'https://ui-avatars.com/api/?name=RL&background=random'),
+('Warframe', 'https://ui-avatars.com/api/?name=Warframe&background=random'),
+('Destiny 2', 'https://ui-avatars.com/api/?name=Destiny2&background=random'),
+('World of Warcraft', 'https://ui-avatars.com/api/?name=WOW&background=random'),
+('Final Fantasy XIV', 'https://ui-avatars.com/api/?name=FFXIV&background=random'),
+('Albion Online', 'https://ui-avatars.com/api/?name=Albion&background=random'),
+('Black Desert Online', 'https://ui-avatars.com/api/?name=BDO&background=random'),
+('Tower of Fantasy', 'https://ui-avatars.com/api/?name=TOF&background=random'),
+('Lost Ark', 'https://ui-avatars.com/api/?name=Lost_Ark&background=random'),
+('ARK: Survival Evolved', 'https://ui-avatars.com/api/?name=ARK&background=random'),
+('Rust', 'https://ui-avatars.com/api/?name=Rust&background=random'),
+('DayZ', 'https://ui-avatars.com/api/?name=DayZ&background=random'),
 ('Terraria', 'https://example.com/terraria.png'),
 ('Don''t Starve Together', 'https://example.com/dont_starve_together.png'),
 ('Sea of Thieves', 'https://example.com/sea_of_thieves.png'),
-('Phasmophobia', 'https://example.com/phasmophobia.png'),
-('Dead by Daylight', 'https://example.com/dead_by_daylight.png'),
-('War Thunder', 'https://example.com/war_thunder.png'),
-('World of Tanks Blitz', 'https://example.com/wot_blitz.png'),
-('Asphalt 9: Legends', 'https://example.com/asphalt9.png'),
-('Trackmania', 'https://example.com/trackmania.png'),
-('The Battle of Polytopia', 'https://example.com/polytopia.png'),
-('Dota Underlords', 'https://example.com/dota_underlords.png'),
-('Teamfight Tactics', 'https://example.com/tft.png'),
-('Ludo King', 'https://example.com/ludo_king.png'),
-('Standoff 2', 'https://example.com/standoff2.png'),
-('Critical Ops', 'https://example.com/critical_ops.png'),
-('Delta Force', 'https://example.com/delta_force.png'),
-('Destiny: Rising', 'https://example.com/destiny_rising.png')
+('Phasmophobia', 'https://ui-avatars.com/api/?name=Phasmo&background=random'),
+('Dead by Daylight', 'https://ui-avatars.com/api/?name=DBD&background=random'),
+('War Thunder', 'https://ui-avatars.com/api/?name=WT&background=random'),
+('World of Tanks Blitz', 'https://ui-avatars.com/api/?name=WOTB&background=random'),
+('Asphalt 9: Legends', 'https://ui-avatars.com/api/?name=Asphalt9&background=random'),
+('Trackmania', 'https://ui-avatars.com/api/?name=TM&background=random'),
+('The Battle of Polytopia', 'https://ui-avatars.com/api/?name=Polytopia&background=random'),
+('Dota Underlords', 'https://ui-avatars.com/api/?name=Underlords&background=random'),
+('Teamfight Tactics', 'https://ui-avatars.com/api/?name=TFT&background=random'),
+('Ludo King', 'https://ui-avatars.com/api/?name=Ludo&background=random'),
+('Standoff 2', 'https://ui-avatars.com/api/?name=Standoff2&background=random'),
+('Critical Ops', 'https://ui-avatars.com/api/?name=COPS&background=random'),
+('Delta Force', 'https://ui-avatars.com/api/?name=Delta&background=random'),
+('Destiny: Rising', 'https://ui-avatars.com/api/?name=DR&background=random')
 ON CONFLICT DO NOTHING;
 
 -- Insert Users
 INSERT INTO users (id, name, email, password, is_admin, last_active_at, created_at, updated_at) VALUES
 (1, 'Example1', 'example1@gmail.com', '$2b$10$JBEx3Q1TdfbmLO22iuI9dOBJqkHIpLrzXX0Tj.b.etV.ZOjSXbIx.', FALSE, '2026-03-11 10:43:26.478294', '2026-03-11 10:43:26.478294', '2026-03-11 10:43:26.478294'),
 (2, 'Example2', 'example2@gmail.com', '$2b$10$vbjOEV7/s6eMYYwUxrjOwulRIqnNBXKnJPrt9S5LMrBqM9g4q34Uy', FALSE, '2026-03-11 10:54:49.992932', '2026-03-11 10:54:49.992932', '2026-03-11 10:54:49.992932');
+
+-- Reset the sequence for users id
+SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 
 -- Insert Profiles
 INSERT INTO profiles (user_id, display_name, bio, birth_date, country, profile_image_url, updated_at) VALUES

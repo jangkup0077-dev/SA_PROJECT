@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { pool } from '../config/db.js';
 import { AuthRequest } from '../middleware/authMiddleware.js';
 import { io } from '../index.js'; 
+import { notificationService } from '../services/notificationService.js';
 
 export const getMessages = async (req: AuthRequest, res: Response) => {
   try {
@@ -13,7 +14,7 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
     }
 
     const checkMatch = await pool.query(
-      'SELECT * FROM matches WHERE id = $1 AND (user_one_id = $2 OR user_two_id = $2)',
+      'SELECT * FROM matches WHERE id = $1 AND (user_one_id = $2 OR user_two_id = $2) AND is_active = true',
       [matchId, myId]
     );
 
@@ -48,12 +49,22 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     }
 
     const checkMatch = await pool.query(
-      'SELECT * FROM matches WHERE id = $1 AND (user_one_id = $2 OR user_two_id = $2)',
+      'SELECT * FROM matches WHERE id = $1 AND (user_one_id = $2 OR user_two_id = $2) AND is_active = true',
       [matchId, myId]
     );
 
     if (checkMatch.rows.length === 0) {
       return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Check if sender is suspended
+    const senderRes = await pool.query('SELECT is_suspended, suspension_until FROM users WHERE id = $1', [myId]);
+    const sender = senderRes.rows[0];
+    if (sender?.is_suspended && new Date(sender.suspension_until) > new Date()) {
+      return res.status(403).json({ 
+        message: 'Your account is suspended. You cannot send messages.',
+        suspension_until: sender.suspension_until 
+      });
     }
 
     //const matchData = checkMatch.rows[0];
@@ -70,7 +81,16 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
 
     const matchData = checkMatch.rows[0];
     const targetUserId = matchData.user_one_id === myId ? matchData.user_two_id : matchData.user_one_id;
-    io.to(`user_${targetUserId}`).emit('new_notification', { type: 'message' });
+    
+    // Persistent notification for message
+    const senderName = req.user?.name || 'Someone';
+    await notificationService.sendNotification({
+      userId: targetUserId,
+      type: 'message',
+      title: 'New Message',
+      message: `${senderName} sent you a message`,
+      entityId: Number(matchId)
+    });
 
     res.status(201).json(savedMessage);
   } catch (err) {

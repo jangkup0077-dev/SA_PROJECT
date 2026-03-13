@@ -59,9 +59,25 @@ export const useChatStore = defineStore('chat', {
                 console.error('Failed to send message', err)
             }
         },
+        async unmatch(matchId: number) {
+            try {
+                await api.delete(`/swipe/unmatch/${matchId}`)
+                // Remove from local list
+                this.matchesList = this.matchesList.filter(m => m.id !== matchId)
+                if (this.activeMatchId === matchId) {
+                    this.activeMatchId = null
+                }
+            } catch (err) {
+                console.error('Failed to unmatch', err)
+                throw err
+            }
+        },
         receiveMessage(msg: ChatMessage) {
             if (msg.match_id === this.activeMatchId) {
-                this.messages.push(msg)
+                // Defensive check: don't push if ID already exists
+                if (!this.messages.find(m => m.id === msg.id)) {
+                    this.messages.push(msg)
+                }
             }
             // Also update latest message in matchesList
             const matchIndex = this.matchesList.findIndex((m: any) => m.id === msg.match_id)

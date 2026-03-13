@@ -29,29 +29,42 @@ export const useSwipeStore = defineStore('swipe', {
 
                 this.profiles = res.data
                     .filter((p: any) => p.user_id !== myId) 
-                    .map((p: any) => ({
-                        id: p.user_id,
-                        name: p.display_name,
-                        bio: p.bio,
-                        country: p.country,
-                        birth_date: p.birth_date,
-                        profile_image_url: p.profile_image_url || [],
-                        games: (p.shared_games || []).map((g: any) => ({
-                            id: g.id,
-                            game_name: g.name || g.game_name
-                        }))
-                    }))
+                    .map((p: any) => {
+                        // Normalize profile_image_url: pg can return TEXT[] as string "{url1,url2}"
+                        let images = p.profile_image_url
+                        if (typeof images === 'string') {
+                            images = images.replace(/^\{|\}$/g, '').split(',').filter(Boolean)
+                        }
+                        if (!Array.isArray(images)) images = []
+
+                        return {
+                            id: p.user_id,
+                            name: p.display_name,
+                            bio: p.bio,
+                            country: p.country,
+                            birth_date: p.birth_date,
+                            profile_image_url: images,
+                            games: (p.shared_games || []).map((g: any) => ({
+                                id: g.id,
+                                game_name: g.name || g.game_name
+                            }))
+                        }
+                    })
             } catch (err) {
                 console.error('Failed to fetch potential matches', err)
             } finally {
                 this.loading = false
             }
         },
-        // แก้ไขฟังก์ชันนี้ใน src/stores/swipe.ts
         async registerSwipe(targetId: number, action: 'LIKE' | 'SKIP') {
             console.log(`[SWIPE START] Sending swipe action for targetId: ${targetId}, status: ${action}`)
             
+            // Capture profile info NOW before it gets removed from the local array
             const targetProfile = this.profiles.find(p => p.id === targetId);
+            const profileName = targetProfile?.name || 'User';
+            const profileAvatar = (targetProfile?.profile_image_url && targetProfile.profile_image_url.length > 0) 
+                ? targetProfile.profile_image_url[0] 
+                : '';
 
             try {
                 const res = await api.post('/swipe', { targetId, status: action })
@@ -61,8 +74,8 @@ export const useSwipeStore = defineStore('swipe', {
                     this.matchTriggered = {
                         userId: targetId,
                         matchId: res.data.matchId,
-                        avatar: targetProfile?.profile_image_url?.[0] || '',
-                        name: targetProfile?.name || 'User'
+                        avatar: profileAvatar,
+                        name: profileName
                     }
                 }
             } catch (err: any) {

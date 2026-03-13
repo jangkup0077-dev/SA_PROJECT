@@ -17,8 +17,9 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
     return {
-      folder: 'game-match-profiles', // ชื่อโฟลเดอร์ที่จะสร้างใน Cloudinary
-      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+      folder: 'game-match-chat-media',
+      resource_type: 'auto', // Essential for videos
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'avi', 'mkv'],
     };
   },
 });

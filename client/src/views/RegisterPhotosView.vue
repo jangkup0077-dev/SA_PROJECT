@@ -71,12 +71,13 @@ const handleCreateAccount = async () => {
     for (const photo of photos) {
       try {
         const formData = new FormData()
-        formData.append('image', photo)
+        formData.append('file', photo) // Backend expects 'file' not 'image' based on multer upload.single('file')
         const uploadRes = await api.post('/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
-        uploadedUrls.push(uploadRes.data.imageUrl)
-      } catch {
+        uploadedUrls.push(uploadRes.data.url)
+      } catch (err) {
+        console.error('Upload failed', err)
         // If upload fails, continue
       }
     }
@@ -124,9 +125,9 @@ const handleCreateAccount = async () => {
     <button
       @click="router.push('/register/tags')"
       id="photos-back-button"
-      class="w-10 h-10 rounded-full bg-[var(--color-input-bg)] flex items-center justify-center mt-2 hover:bg-white/10 transition-colors cursor-pointer"
+      class="w-10 h-10 rounded-full bg-gm-panel flex items-center justify-center mt-2 hover:bg-gm-hover hover:text-black transition duration-200 cursor-pointer shadow-sm"
     >
-      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-5 h-5 flex items-center justify-center" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 19.5L8.25 12l7.5-7.5" />
       </svg>
     </button>
@@ -136,7 +137,7 @@ const handleCreateAccount = async () => {
       <div class="w-full max-w-sm flex flex-col items-center">
 
         <!-- Icon -->
-        <div class="w-20 h-20 rounded-full bg-[var(--color-input-bg)] flex items-center justify-center mb-8 shadow-lg shadow-purple-500/10">
+        <div class="w-20 h-20 rounded-full bg-gm-panel flex items-center justify-center mb-8 shadow-md">
           <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
               d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
@@ -158,7 +159,7 @@ const handleCreateAccount = async () => {
             <!-- Slot with image -->
             <div
               v-if="slot"
-              class="relative aspect-square rounded-2xl overflow-hidden border-2 border-purple-500/30 group cursor-pointer"
+              class="relative aspect-square rounded-[12px] overflow-hidden border border-gm-primary shadow-sm group cursor-pointer"
               @click="triggerFileInput(index)"
             >
               <img
@@ -169,7 +170,7 @@ const handleCreateAccount = async () => {
               <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <button
                   @click.stop="removePhoto(index)"
-                  class="w-8 h-8 rounded-full bg-red-500/80 flex items-center justify-center cursor-pointer"
+                  class="w-8 h-8 rounded-full bg-gm-danger flex items-center justify-center cursor-pointer shadow-md"
                 >
                   <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -182,11 +183,11 @@ const handleCreateAccount = async () => {
             <div
               v-else
               @click="triggerFileInput(index)"
-              class="aspect-square rounded-2xl border-2 border-dashed border-white/15 bg-[var(--color-input-bg)]/50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-purple-500/40 hover:bg-white/5 transition-all"
+              class="aspect-square rounded-[12px] border-2 border-dashed border-white/10 bg-gm-panel flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-gm-hover hover:bg-white/5 transition duration-200"
             >
               <!-- First empty slot gets "+" button -->
               <template v-if="index === firstEmptySlot">
-                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <div class="w-12 h-12 rounded-full bg-gm-primary flex items-center justify-center shadow-[0_4px_15px_rgba(0,0,0,0.5)]">
                   <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15" />
                   </svg>
@@ -203,14 +204,14 @@ const handleCreateAccount = async () => {
           </template>
         </div>
 
-        <p v-if="errorMsg" class="text-red-400 text-sm text-center font-medium mb-4">{{ errorMsg }}</p>
+        <p v-if="errorMsg" class="text-gm-danger text-sm text-center font-medium mb-4">{{ errorMsg }}</p>
 
         <!-- Create Account Button -->
         <button
           @click="handleCreateAccount"
           :disabled="loading"
           id="create-account-button"
-          class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-2xl shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
+          class="w-full py-3.5 bg-gm-primary text-white font-semibold rounded-[12px] shadow-[0_4px_20px_rgba(0,0,0,0.5)] hover:bg-gm-hover hover:text-black transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
         >
           {{ loading ? 'Creating Account...' : 'Create Account' }}
         </button>

@@ -11,11 +11,11 @@ const emit = defineEmits(['toggle'])
   <button
     type="button"
     @click="emit('toggle')"
-    class="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border whitespace-nowrap"
+    class="px-4 py-2 rounded-[12px] text-sm font-semibold transition-all duration-200 border border-transparent whitespace-nowrap shadow-sm"
     :class="[
       selected 
-        ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-[0_0_12px_rgba(124,58,237,0.2)]'
-        : 'bg-white/5 border-white/10 text-gray-300 hover:bg-purple-600/10 hover:border-purple-500/40'
+        ? 'bg-gm-primary text-white'
+        : 'bg-white/5 text-gray-300 hover:bg-gm-hover hover:text-black'
     ]"
   >
     {{ name }}
