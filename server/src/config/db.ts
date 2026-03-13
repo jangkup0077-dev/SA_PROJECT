@@ -1,5 +1,7 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -16,11 +18,33 @@ export const connectDB = async (retries = 5) => {
       const client = await pool.connect();
       console.log('✅ Database Connected Successfully');
       
-      client.release(); 
-      
+      try {
+        const check = await client.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'users'
+          );
+        `);
+        
+        if (!check.rows[0].exists) {
+          console.log('📦 Database is empty! Auto-running init.sql...');
+          
+          const sqlPath = path.join(process.cwd(), 'src/init.sql');
+          const sql = fs.readFileSync(sqlPath, 'utf8');
+          await client.query(sql);
+          
+          console.log('🎉 Database tables & mock data created successfully!');
+        } else {
+          console.log('⚡ Database is already initialized.');
+        }
+      } catch (initErr: any) {
+        console.error('❌ Auto Init DB Failed:', initErr.message);
+      }
+
+      client.release(); // คืนการเชื่อมต่อ
       break; 
     } catch (err: any) {
-      retries -= 1
+      retries -= 1;
       console.error(`❌ Database Connection Failed: ${err.message}`);
       console.error(`Retrying in 3 seconds... (Retries left: ${retries})`);
       
